@@ -1,0 +1,56 @@
+{
+  "name": "osslibraries-hvigor-plugin",
+  "version": "0.0.1",
+  "description": "A Hvigor plugin that scans OHPM dependencies of HarmonyOS projects and generates license metadata for the OSSLibraries library.",
+  "homepage": "https://github.com/composable-tu/osslibraries-hvigor-plugin#readme",
+  "bugs": {
+    "url": "https://github.com/composable-tu/osslibraries-hvigor-plugin/issues"
+  },
+  "license": "MulanPSL-2.0",
+  "author": "composable-tu",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/composable-tu/osslibraries-hvigor-plugin.git"
+  },
+  "type": "module",
+  "main": "dist/index.cjs",
+  "types": "dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "prepare": "vp pack"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "json5": "^2.2.3",
+    "spdx-correct": "^3.2.0",
+    "spdx-license-list": "^6.12.0"
+  },
+  "devDependencies": {
+    "@ohos/hvigor": "6.26.2",
+    "@types/node": "^26.1.2",
+    "@types/spdx-correct": "^3.1.3",
+    "typescript": "^7.0.2",
+    "vite-plus": "0.2.7"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.17.0",
+      "onFail": "download"
+    }
+  }
+}
