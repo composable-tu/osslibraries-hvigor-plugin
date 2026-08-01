@@ -57,7 +57,7 @@ export interface ScanResult {
  * Module names that belong to the host project and must NOT appear in the
  * generated license list. Callers may extend this via scanProject options.
  */
-const DEFAULT_SELF_MODULES = new Set<string>(["entry", "osslibraries", "osslibraries_ui"]);
+const DEFAULT_SELF_MODULES = new Set<string>(["entry"]);
 
 /** Parse a JSON5 string into an object. */
 export function parseJson5(text: string): Record<string, unknown> {
