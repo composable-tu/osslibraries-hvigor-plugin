@@ -11,7 +11,6 @@ export {
   serializeResult,
   resolveLicense,
   buildLibrary,
-  stripJson5,
   parseJson5,
 } from "./scanner.js";
 export type { ScanResult, ScanOptions, LibraryEntry, LicenseEntry } from "./scanner.js";

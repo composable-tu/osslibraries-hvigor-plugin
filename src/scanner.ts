@@ -19,6 +19,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import JSON5 from "json5";
 import correct from "spdx-correct";
 import spdxList from "spdx-license-list";
 
@@ -54,125 +55,13 @@ export interface ScanResult {
 
 /**
  * Module names that belong to the host project and must NOT appear in the
- * generated license list. Callers may override this via scanProject options.
+ * generated license list. Callers may extend this via scanProject options.
  */
 const DEFAULT_SELF_MODULES = new Set<string>(["entry", "osslibraries", "osslibraries_ui"]);
 
-/**
- * Strip JSON5 syntax (comments, trailing commas, unquoted keys, single-quoted
- * strings) so JSON.parse can read it.
- */
-export function stripJson5(input: string): string {
-  let result = "";
-  let i = 0;
-  const len = input.length;
-  let inString = false;
-  let stringChar = "";
-  let expectKey = false;
-
-  while (i < len) {
-    const ch = input.charAt(i);
-    const next = i + 1 < len ? input.charAt(i + 1) : "";
-
-    if (inString) {
-      if (ch === "\\" && i + 1 < len) {
-        result += ch;
-        result += next;
-        i += 2;
-        continue;
-      }
-      if (ch === stringChar) {
-        inString = false;
-        expectKey = false;
-        result += '"';
-        i += 1;
-        continue;
-      }
-      result += ch;
-      i += 1;
-      continue;
-    }
-
-    // Single-quoted strings -> convert to double-quoted JSON string.
-    if (ch === "'") {
-      inString = true;
-      stringChar = "'";
-      result += '"';
-      i += 1;
-      continue;
-    }
-    // Double-quoted strings pass through.
-    if (ch === '"') {
-      inString = true;
-      stringChar = '"';
-      result += ch;
-      i += 1;
-      continue;
-    }
-
-    // Single-line comment
-    if (ch === "/" && next === "/") {
-      i += 2;
-      while (i < len && input.charAt(i) !== "\n") {
-        i += 1;
-      }
-      continue;
-    }
-
-    // Block comment
-    if (ch === "/" && next === "*") {
-      i += 2;
-      while (i < len && !(input.charAt(i) === "*" && i + 1 < len && input.charAt(i + 1) === "/")) {
-        i += 1;
-      }
-      i += 2;
-      continue;
-    }
-
-    // Whitespace
-    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
-      result += ch;
-      i += 1;
-      continue;
-    }
-
-    // Structural chars that set "expectKey" true.
-    if (ch === "{" || ch === ",") {
-      result += ch;
-      expectKey = true;
-      i += 1;
-      continue;
-    }
-    if (ch === ":" || ch === "}" || ch === "[" || ch === "]") {
-      result += ch;
-      expectKey = false;
-      i += 1;
-      continue;
-    }
-
-    // Unquoted key: identifier-start char where a key is expected.
-    if (expectKey && /[A-Za-z_$]/.test(ch)) {
-      let key = "";
-      while (i < len && /[A-Za-z0-9_$]/.test(input.charAt(i))) {
-        key += input.charAt(i);
-        i += 1;
-      }
-      result += '"' + key + '"';
-      expectKey = false;
-      continue;
-    }
-
-    result += ch;
-    i += 1;
-  }
-
-  result = result.replace(/,(\s*[}\]])/g, "$1");
-  return result;
-}
-
 /** Parse a JSON5 string into an object. */
 export function parseJson5(text: string): Record<string, unknown> {
-  const parsed: unknown = JSON.parse(stripJson5(text));
+  const parsed: unknown = JSON5.parse(text);
   return isRecord(parsed) ? parsed : {};
 }
 
@@ -181,8 +70,9 @@ export function parseJson5(text: string): Record<string, unknown> {
  *
  * A declaration may be:
  *  - a single SPDX id ("Apache-2.0")
- *  - an SPDX expression ("Apache-2.0 OR MIT") — each token is corrected and
- *    looked up; first known id wins
+ *  - an SPDX expression ("Apache-2.0 OR MIT") — operators (OR/AND/WITH) and
+ *    surrounding punctuation are skipped, and each token is corrected and
+ *    looked up; the first known id wins
  *  - a free-form license name (corrected/looked-up miss; falls back to a
  *    minimal entry named after the original declaration)
  *
@@ -216,11 +106,18 @@ export function resolveLicense(declaration: string): LicenseEntry | null {
     };
   }
 
-  // Split SPDX expressions on whitespace operators, try each token.
+  // Best-effort SPDX expression handling: split on whitespace, strip
+  // surrounding punctuation, and ignore the OR/AND/WITH operators. Only a
+  // single license ID is resolved from a possibly complex expression.
   const tokens = trimmed.split(/\s+/);
   for (const tok of tokens) {
-    const corrected = correct(tok);
-    const id = corrected ?? tok;
+    const normalized = tok.replace(/^[()[\],;]+|[()[\],;]+$/g, "");
+    if (!normalized || /^(OR|AND|WITH)$/i.test(normalized)) {
+      continue;
+    }
+
+    const corrected = correct(normalized);
+    const id = corrected ?? normalized;
     if (list[id]) {
       const meta = list[id];
       return {
@@ -506,7 +403,12 @@ function scanOhModulesDir(
  *   - <projectRoot>/<module>/oh_modules (for every module dir)
  */
 export function scanProject(projectRoot: string, options?: ScanOptions): ScanResult {
-  const selfModules = options?.selfModules ?? DEFAULT_SELF_MODULES;
+  // Start from the defaults and extend with any caller-provided modules so
+  // the host-project modules are never accidentally included.
+  const selfModules = new Set<string>(DEFAULT_SELF_MODULES);
+  for (const name of options?.selfModules ?? []) {
+    selfModules.add(name);
+  }
   const licensesMap: Record<string, LicenseEntry> = {};
   const libsMap: Record<string, LibraryEntry> = {};
 

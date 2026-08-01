@@ -32,6 +32,7 @@
     "prepare": "vp pack"
   },
   "dependencies": {
+    "json5": "^2.2.3",
     "spdx-correct": "^3.2.0",
     "spdx-license-list": "^6.12.0"
   },
