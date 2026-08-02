@@ -1,6 +1,6 @@
 # OSSLibraries Hvigor Plugin
 
-一个 Hvigor 插件，用于扫描 HarmonyOS 项目的 OHPM 依赖项，并为 OSSLibraries 库生成许可证元数据。
+一个 Hvigor 插件，用于扫描 HarmonyOS 项目的 OHPM 依赖项，并为 [OSSLibraries](https://github.com/composable-tu/osslibraries) 库生成许可证元数据。
 
 [English](README.md)
 
