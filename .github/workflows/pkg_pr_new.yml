@@ -11,6 +11,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Setup npmrc
+        run: mv .npmrc_example .npmrc
+
       - uses: pnpm/action-setup@v6
         with:
           version: 11
@@ -20,9 +23,6 @@ jobs:
         with:
           node-version: 26
           cache: true
-
-      - name: Setup npmrc
-        run: mv .npmrc_example .npmrc
 
       - name: Install dependencies
         run: vp install
