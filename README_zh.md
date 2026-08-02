@@ -1,16 +1,16 @@
 # OSSLibraries Hvigor Plugin
 
-A Hvigor plugin to scan OHPM dependencies in a HarmonyOS project and generate license metadata for the OSSLibraries library.
+一个 Hvigor 插件，用于扫描 HarmonyOS 项目的 OHPM 依赖项，并为 OSSLibraries 库生成许可证元数据。
 
-[中文文档](README_zh.md)
+[English](README.md)
 
-Install with npm:
+使用 npm 安装：
 
 ```zsh
 npm install osslibraries-hvigor-plugin --save-dev
 ```
 
-It can also be installed using other package managers/build tools such as Yarn, pnpm, Vite+, vlt, Bun, etc.:
+也可以使用 Yarn、pnpm、Vite+、vlt、Bun 等包管理器/构建工具安装：
 
 ```zsh
 yarn add osslibraries-hvigor-plugin --dev
@@ -20,7 +20,7 @@ vlt install osslibraries-hvigor-plugin -D
 bun add osslibraries-hvigor-plugin -D
 ```
 
-Then edit `entry/hvigorfile.ts` to register the plugin:
+然后编辑 `entry/hvigorfile.ts` 以注册插件:
 
 ```TS
 import { hapTasks } from '@ohos/hvigor-ohos-plugin';
@@ -33,10 +33,10 @@ export default {
 ```
 
 > [!TIP]
-> If your project has modules that you do not want to appear in the license list, you can pass their dependency names to `selfModules`:
+> 如果你的项目有不想出现在 License 列表中的模块，可以将依赖名传入 `selfModules`:
 >
 > ```ts
 > plugins: [ossScanPlugin({ selfModules: ['mylibrary', '3rdlibrary'] })]
 > ```
 
-On each build, the plugin scans `oh_modules/` and generates `entry/src/main/resources/rawfile/osslibraries.json`.
+每次构建时，插件会扫描 `oh_modules/` 并生成 `entry/src/main/resources/rawfile/osslibraries.json`。

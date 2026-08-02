@@ -1,0 +1,49 @@
+name: Publish Package
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write # Required for OIDC
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check commit message
+        id: check
+        run: |
+          MSG=$(git log -1 --pretty=%s)
+          if [[ "$MSG" == \[publish\]* ]]; then
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.check.outputs.should_publish == 'true'
+        with:
+          node-version: "26"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - uses: pnpm/action-setup@v6
+        if: steps.check.outputs.should_publish == 'true'
+        with:
+          version: 11
+
+      - run: mv .npmrc_example .npmrc
+        if: steps.check.outputs.should_publish == 'true'
+      - run: pnpm ci
+        if: steps.check.outputs.should_publish == 'true'
+      - run: pnpm run build --if-present
+        if: steps.check.outputs.should_publish == 'true'
+      - run: pnpm test
+        if: steps.check.outputs.should_publish == 'true'
+      - run: pnpm publish
+        if: steps.check.outputs.should_publish == 'true'

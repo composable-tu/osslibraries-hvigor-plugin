@@ -1,0 +1,33 @@
+name: Publish Any Commit
+on: [push, pull_request]
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - run: corepack enable
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: 26
+          cache: true
+
+      - name: Setup npmrc
+        run: mv .npmrc_example .npmrc
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Build
+        run: vp pack
+
+      - run: vp exec pkg-pr-new publish --pnpm --commentWithSha
