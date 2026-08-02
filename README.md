@@ -4,13 +4,13 @@ A Hvigor plugin to scan OHPM dependencies in a HarmonyOS project and generate li
 
 [中文文档](README_zh.md)
 
-Install with npm:
+Install via npm:
 
 ```zsh
 npm install osslibraries-hvigor-plugin --save-dev
 ```
 
-It can also be installed using other package managers/build tools such as Yarn, pnpm, Vite+, vlt, Bun, etc.:
+Other package managers also work:
 
 ```zsh
 yarn add osslibraries-hvigor-plugin --dev
@@ -33,7 +33,7 @@ export default {
 ```
 
 > [!TIP]
-> If your project has modules that you do not want to appear in the license list, you can pass their dependency names to `selfModules`:
+> If you have modules that should not appear in the license list, pass their dependency names to `selfModules`:
 >
 > ```ts
 > plugins: [ossScanPlugin({ selfModules: ['mylibrary', '3rdlibrary'] })]
