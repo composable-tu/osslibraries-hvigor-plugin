@@ -14,7 +14,7 @@ jobs:
       - name: Setup npmrc
         run: mv .npmrc_example .npmrc
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6.0.9
         with:
           version: 11
 
