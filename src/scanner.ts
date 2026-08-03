@@ -19,6 +19,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { createHash } from "crypto";
 import JSON5 from "json5";
 import correct from "spdx-correct";
 import spdxList from "spdx-license-list";
@@ -58,6 +59,17 @@ export interface ScanResult {
  * generated license list. Callers may extend this via scanProject options.
  */
 const DEFAULT_SELF_MODULES = new Set<string>(["entry"]);
+
+/**
+ * Compute a stable, short identifier for license text.
+ *
+ * The hash is derived purely from the license content, so packages shipping
+ * identical license text resolve to a single shared entry while packages with
+ * different text (e.g. different attribution lines) get distinct entries.
+ */
+function contentHash(text: string): string {
+  return createHash("sha256").update(text).digest("hex").slice(0, 16);
+}
 
 /** Parse a JSON5 string into an object. */
 export function parseJson5(text: string): Record<string, unknown> {
@@ -255,6 +267,7 @@ export function buildLibrary(
     if (lic) {
       if (licenseFileContent.length > 0) {
         lic.content = licenseFileContent;
+        lic.hash = contentHash(licenseFileContent);
       }
       resolvedLicenses.push(lic);
     }
@@ -263,7 +276,7 @@ export function buildLibrary(
   // No license declared in oh-package.json5, but a LICENSE file exists.
   if (resolvedLicenses.length === 0 && licenseFileContent.length > 0) {
     resolvedLicenses.push({
-      hash: "LICENSE",
+      hash: contentHash(licenseFileContent),
       name: "License",
       url: "",
       spdxId: "",
@@ -282,7 +295,7 @@ export function buildLibrary(
     organization: null,
     funding: [],
     tag: "",
-    licenses: resolvedLicenses.map((l) => l.hash),
+    licenses: [...new Set(resolvedLicenses.map((l) => l.hash))],
   };
 
   return { lib, licenses: resolvedLicenses };

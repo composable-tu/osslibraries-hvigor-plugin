@@ -36,7 +36,7 @@ export default {
 > If you have modules that should not appear in the license list, pass their dependency names to `selfModules`:
 >
 > ```ts
-> plugins: [ossScanPlugin({ selfModules: ['mylibrary', '3rdlibrary'] })]
+> plugins: [ossScanPlugin({ selfModules: ["mylibrary", "3rdlibrary"] })];
 > ```
 
 On each build, the plugin scans `oh_modules/` and generates `entry/src/main/resources/rawfile/osslibraries.json`.
