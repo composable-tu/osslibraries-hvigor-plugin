@@ -61,14 +61,16 @@ export interface ScanResult {
 const DEFAULT_SELF_MODULES = new Set<string>(["entry"]);
 
 /**
- * Compute a stable, short identifier for license text.
+ * Compute a stable identifier for license text.
  *
- * The hash is derived purely from the license content, so packages shipping
- * identical license text resolve to a single shared entry while packages with
- * different text (e.g. different attribution lines) get distinct entries.
+ * The full SHA-256 digest is used because the hash acts as the map key for
+ * downstream consumers — truncating it could silently merge distinct license
+ * variants. Packages shipping identical license text resolve to a single
+ * shared entry, while packages with different text (e.g. different
+ * attribution lines) get distinct entries.
  */
 function contentHash(text: string): string {
-  return createHash("sha256").update(text).digest("hex").slice(0, 16);
+  return createHash("sha256").update(text).digest("hex");
 }
 
 /** Parse a JSON5 string into an object. */
