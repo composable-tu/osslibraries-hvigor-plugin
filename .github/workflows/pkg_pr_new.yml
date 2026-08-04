@@ -14,12 +14,12 @@ jobs:
       - name: Setup npmrc
         run: mv .npmrc_example .npmrc
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6.0.9
         with:
           version: 11
 
       - run: corepack enable
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: voidzero-dev/setup-vp@v1.15.0
         with:
           node-version: 26
           cache: true
