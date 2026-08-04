@@ -2,6 +2,8 @@
 
 A Hvigor plugin to scan OHPM dependencies in a HarmonyOS project and generate license metadata for the [OSSLibraries](https://github.com/composable-tu/osslibraries) library.
 
+![](./readme-assets/banner.png)
+
 [中文文档](README_zh.md)
 
 Install via npm:

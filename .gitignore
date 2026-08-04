@@ -144,3 +144,5 @@ vite.config.ts.timestamp-*
 
 .idea
 .npmrc
+
+.DS_Store
