@@ -15,4 +15,7 @@ export default defineConfig({
     sourcemap: true,
     minify: true,
   },
+  test: {
+    include: ["test/**/*.test.ts"],
+  },
 });

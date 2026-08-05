@@ -11,160 +11,28 @@
  */
 
 /**
- * Build-time OHPM dependency scanner.
+ * OHPM dependency scanner.
  *
- * Walks a project's oh_modules directories, reads each dependency's
- * oh-package.json5, resolves SPDX license IDs using the `spdx-correct` and
- * `spdx-license-list` npm packages, prefers the LICENSE file shipped inside
- * each HAR package for the full license text, and emits OSSLibraries JSON
- * consumed by the OSSLibraries UI library at runtime.
- *
- * Output JSON shape (compatible with OSSLibraries Parser):
- * {
- *   "libraries": [ { ..., "licenses": ["hash1"] } ],
- *   "licenses":  { "hash1": { "hash": "...", "name": "...", "content": "..." } }
- * }
- *
- * @module scanner
+ * Discovers every oh-package.json5 under a project's oh_modules directories
+ * (via fast-glob), assembles one `LibraryEntry` per dependency, deduplicates
+ * by name+version so multiple versions appear side by side, prefers the
+ * LICENSE file bundled in each HAR package for the full license text, and
+ * emits the OSSLibraries JSON consumed by the OSSLibraries UI library.
  */
-"use strict";
 
 import * as fs from "fs";
 import * as path from "path";
-import { createHash } from "crypto";
-import JSON5 from "json5";
-import correct from "spdx-correct";
-import spdxList from "spdx-license-list";
-
-/** Resolved license entry written into the generated JSON. */
-export interface LicenseEntry {
-  hash: string;
-  name: string;
-  url: string;
-  spdxId: string;
-  content: string;
-}
-
-/** Library entry written into the generated JSON. */
-export interface LibraryEntry {
-  uniqueId: string;
-  artifactVersion: string;
-  name: string;
-  description: string;
-  website: string;
-  developers: Array<{ name: string; organisationUrl: string }>;
-  scm: { connection: string; developerConnection: string; url: string } | null;
-  organization: unknown;
-  funding: unknown[];
-  tag: string;
-  licenses: string[];
-}
-
-/** Result of scanning a project. */
-export interface ScanResult {
-  libraries: LibraryEntry[];
-  licenses: Record<string, LicenseEntry>;
-}
+import fg from "fast-glob";
+import semver from "semver";
+import { readOhPackage } from "./ohpm.js";
+import { contentHash, resolveLicense } from "./spdx.js";
+import type { LibraryEntry, LicenseEntry, OhPackage, ScanOptions, ScanResult } from "./types.js";
 
 /**
  * Module names that belong to the host project and must NOT appear in the
  * generated license list. Callers may extend this via scanProject options.
  */
 const DEFAULT_SELF_MODULES = new Set<string>(["entry"]);
-
-/**
- * Compute a stable identifier for license text.
- *
- * The full SHA-256 digest is used because the hash acts as the map key for
- * downstream consumers — truncating it could silently merge distinct license
- * variants. Packages shipping identical license text resolve to a single
- * shared entry, while packages with different text (e.g. different
- * attribution lines) get distinct entries.
- */
-function contentHash(text: string): string {
-  return createHash("sha256").update(text).digest("hex");
-}
-
-/** Parse a JSON5 string into an object. */
-export function parseJson5(text: string): Record<string, unknown> {
-  const parsed: unknown = JSON5.parse(text);
-  return isRecord(parsed) ? parsed : {};
-}
-
-/**
- * Resolve a license declaration string to a license entry.
- *
- * A declaration may be:
- *  - a single SPDX id ("Apache-2.0")
- *  - an SPDX expression ("Apache-2.0 OR MIT") — operators (OR/AND/WITH) and
- *    surrounding punctuation are skipped, and each token is corrected and
- *    looked up; the first known id wins
- *  - a free-form license name (corrected/looked-up miss; falls back to a
- *    minimal entry named after the original declaration)
- *
- * Uses `spdx-correct` to fix common misspellings ("apache2" -> "Apache-2.0")
- * and `spdx-license-list` for the canonical name and URL. Full license text
- * (`content`) is intentionally left empty here — the caller fills it from the
- * HAR package's bundled LICENSE file, which is the authoritative source.
- */
-export function resolveLicense(declaration: string): LicenseEntry | null {
-  if (!declaration || typeof declaration !== "string") {
-    return null;
-  }
-  const trimmed = declaration.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-
-  const list = spdxList;
-
-  // Try the whole declaration first (handles exact SPDX ids and simple
-  // expressions that spdx-correct can normalize as a unit).
-  const correctedWhole = correct(trimmed);
-  if (correctedWhole && list[correctedWhole]) {
-    const meta = list[correctedWhole];
-    return {
-      hash: correctedWhole,
-      name: meta.name,
-      url: meta.url,
-      spdxId: correctedWhole,
-      content: "",
-    };
-  }
-
-  // Best-effort SPDX expression handling: split on whitespace, strip
-  // surrounding punctuation, and ignore the OR/AND/WITH operators. Only a
-  // single license ID is resolved from a possibly complex expression.
-  const tokens = trimmed.split(/\s+/);
-  for (const tok of tokens) {
-    const normalized = tok.replace(/^[()[\],;]+|[()[\],;]+$/g, "");
-    if (!normalized || /^(OR|AND|WITH)$/i.test(normalized)) {
-      continue;
-    }
-
-    const corrected = correct(normalized);
-    const id = corrected ?? normalized;
-    if (list[id]) {
-      const meta = list[id];
-      return {
-        hash: id,
-        name: meta.name,
-        url: meta.url,
-        spdxId: id,
-        content: "",
-      };
-    }
-  }
-
-  // Unknown license — create a minimal entry named after the declaration.
-  return {
-    hash: trimmed,
-    name: trimmed,
-    url: "",
-    spdxId: "",
-    content: "",
-  };
-}
 
 /** Candidate license file names, checked case-insensitively, in preference order. */
 const LICENSE_FILE_NAMES = [
@@ -179,304 +47,170 @@ const LICENSE_FILE_NAMES = [
   "NOTICE.txt",
 ];
 
+/** Find every oh-package.json5 inside the project's oh_modules directories. */
+function findOhPackages(projectRoot: string): string[] {
+  return fg.sync(["**/oh_modules/*/oh-package.json5", "**/oh_modules/@*/*/oh-package.json5"], {
+    cwd: projectRoot,
+    onlyFiles: true,
+  });
+}
+
+/** Derive the package name from its relative path: "@scope/bar" or "foo". */
+function packageNameFromPath(relativePath: string): string {
+  const parts = relativePath.split(path.sep);
+  const idx = parts.indexOf("oh_modules");
+  const next = parts[idx + 1];
+  if (next?.startsWith("@")) {
+    return `${next}/${parts[idx + 2] ?? ""}`;
+  }
+  return next ?? "";
+}
+
 /**
- * Find and read the LICENSE file inside a package directory.
+ * Read the LICENSE file bundled inside a package directory.
  *
  * OHPM-downloaded HAR packages ship their own LICENSE file, which is the
- * authoritative full license text. Returns the contents of the first match,
- * or '' if no file is found.
+ * authoritative full license text. Returns the contents of the first matching
+ * candidate, or "" when none is present.
  */
 function readLicenseFile(pkgDir: string): string {
-  let entries: fs.Dirent[] = [];
+  const actualByName: Record<string, string> = {};
   try {
-    entries = fs.readdirSync(pkgDir, { withFileTypes: true });
+    for (const entry of fs.readdirSync(pkgDir, { withFileTypes: true })) {
+      if (entry.isFile()) {
+        actualByName[entry.name.toUpperCase()] = entry.name;
+      }
+    }
   } catch {
     return "";
   }
 
-  const fileMap: Record<string, string> = {};
-  for (const e of entries) {
-    if (e.isFile()) {
-      fileMap[e.name.toUpperCase()] = e.name;
-    }
-  }
-
   for (const candidate of LICENSE_FILE_NAMES) {
-    const upper = candidate.toUpperCase();
-    if (fileMap[upper]) {
+    const actual = actualByName[candidate.toUpperCase()];
+    if (actual) {
       try {
-        return fs.readFileSync(path.join(pkgDir, fileMap[upper]), "utf-8");
+        return fs.readFileSync(path.join(pkgDir, actual), "utf-8");
       } catch {
-        // Continue to next candidate.
+        // Continue to the next candidate.
       }
     }
   }
   return "";
 }
 
-/** True when the value is a plain (non-array) object. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** Safely read a string field from a parsed JSON5 object. */
-function getStr(obj: Record<string, unknown>, key: string, fallback: string): string {
-  const val = obj[key];
-  if (typeof val === "string") {
-    return val;
-  }
-  return fallback;
-}
-
 /**
- * Build a library entry from a parsed oh-package.json5 object.
- * Returns the library and its resolved licenses (license text filled from the
- * bundled LICENSE file when available).
+ * Build a library entry from a normalized oh-package manifest.
+ *
+ * License text is taken from the bundled LICENSE file when available, and
+ * otherwise filled from the canonical SPDX text in spdx-license-list.
  */
 export function buildLibrary(
-  pkg: Record<string, unknown>,
+  pkg: OhPackage,
   pkgDir: string,
 ): { lib: LibraryEntry; licenses: LicenseEntry[] } {
-  const name = getStr(pkg, "name", "");
-  const version = getStr(pkg, "version", "");
-  const description = getStr(pkg, "description", "");
-  const homepage = getStr(pkg, "homepage", "");
+  const licenseFile = readLicenseFile(pkgDir);
 
-  // Author may be a string or an object {name, email}
-  let authorName = "";
-  const authorRaw = pkg["author"];
-  if (typeof authorRaw === "string") {
-    authorName = authorRaw;
-  } else if (isRecord(authorRaw)) {
-    authorName = getStr(authorRaw, "name", "");
-  }
+  const resolved = pkg.licenseDecls
+    .flatMap((decl) => resolveLicense(decl))
+    .map((lic) =>
+      licenseFile ? { ...lic, content: licenseFile, hash: contentHash(licenseFile) } : lic,
+    );
 
-  // Repository may be a string or {url}
-  let repoUrl = "";
-  const repoRaw = pkg["repository"];
-  if (typeof repoRaw === "string") {
-    repoUrl = repoRaw;
-  } else if (isRecord(repoRaw)) {
-    repoUrl = getStr(repoRaw, "url", "");
-  }
-
-  // License may be a string or an array
-  const licenseDecls: string[] = [];
-  const licenseRaw = pkg["license"];
-  if (typeof licenseRaw === "string") {
-    licenseDecls.push(licenseRaw);
-  } else if (Array.isArray(licenseRaw)) {
-    for (const l of licenseRaw) {
-      if (typeof l === "string") {
-        licenseDecls.push(l);
-      }
-    }
-  }
-
-  const licenseFileContent = readLicenseFile(pkgDir);
-
-  const resolvedLicenses: LicenseEntry[] = [];
-  for (const decl of licenseDecls) {
-    const lic = resolveLicense(decl);
-    if (lic) {
-      if (licenseFileContent.length > 0) {
-        lic.content = licenseFileContent;
-        lic.hash = contentHash(licenseFileContent);
-      }
-      resolvedLicenses.push(lic);
-    }
-  }
-
-  // No license declared in oh-package.json5, but a LICENSE file exists.
-  if (resolvedLicenses.length === 0 && licenseFileContent.length > 0) {
-    resolvedLicenses.push({
-      hash: contentHash(licenseFileContent),
+  // No license declared, but a LICENSE file exists — still surface the text.
+  if (resolved.length === 0 && licenseFile) {
+    resolved.push({
+      hash: contentHash(licenseFile),
       name: "License",
       url: "",
       spdxId: "",
-      content: licenseFileContent,
+      content: licenseFile,
     });
   }
 
   const lib: LibraryEntry = {
-    uniqueId: name,
-    artifactVersion: version,
-    name: name,
-    description: description,
-    website: homepage,
-    developers: authorName ? [{ name: authorName, organisationUrl: "" }] : [],
-    scm: repoUrl ? { connection: "", developerConnection: "", url: repoUrl } : null,
+    uniqueId: pkg.name,
+    artifactVersion: pkg.version,
+    name: pkg.name,
+    description: pkg.description,
+    website: pkg.homepage,
+    developers: pkg.authorName ? [{ name: pkg.authorName, organisationUrl: "" }] : [],
+    scm: pkg.repoUrl ? { connection: "", developerConnection: "", url: pkg.repoUrl } : null,
     organization: null,
     funding: [],
     tag: "",
-    licenses: [...new Set(resolvedLicenses.map((l) => l.hash))],
+    licenses: [...new Set(resolved.map((l) => l.hash))],
   };
 
-  return { lib, licenses: resolvedLicenses };
-}
-
-/** Read and parse an oh-package.json5 file; returns null on failure. */
-function readOhPackage(filePath: string): Record<string, unknown> | null {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-  try {
-    const text = fs.readFileSync(filePath, "utf-8");
-    return parseJson5(text);
-  } catch {
-    return null;
-  }
-}
-
-/** Options for scanProject. */
-export interface ScanOptions {
-  /** Module names to skip (host-project local modules). */
-  selfModules?: Set<string>;
-}
-
-/**
- * Read a single package directory, resolve its metadata, and accumulate.
- * Skips symlinks pointing to project-local modules and already-collected ids.
- */
-function collectPackage(
-  pkgDir: string,
-  fallbackName: string,
-  licensesMap: Record<string, LicenseEntry>,
-  libsMap: Record<string, LibraryEntry>,
-  selfModules: Set<string>,
-): void {
-  const pkgJsonPath = path.join(pkgDir, "oh-package.json5");
-  const pkg = readOhPackage(pkgJsonPath);
-  if (!pkg) {
-    return;
-  }
-
-  const pkgName = getStr(pkg, "name", fallbackName);
-
-  if (selfModules.has(pkgName)) {
-    return;
-  }
-  if (libsMap[pkgName]) {
-    return;
-  }
-
-  const { lib, licenses } = buildLibrary(pkg, pkgDir);
-  libsMap[lib.uniqueId] = lib;
-  for (const lic of licenses) {
-    if (!licensesMap[lic.hash]) {
-      licensesMap[lic.hash] = lic;
-    }
-  }
-}
-
-/** Scan a single oh_modules directory and collect package info. */
-function scanOhModulesDir(
-  ohModulesDir: string,
-  licensesMap: Record<string, LicenseEntry>,
-  libsMap: Record<string, LibraryEntry>,
-  selfModules: Set<string>,
-): void {
-  if (!fs.existsSync(ohModulesDir)) {
-    return;
-  }
-
-  let entries: fs.Dirent[] = [];
-  try {
-    entries = fs.readdirSync(ohModulesDir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-
-  for (const entry of entries) {
-    if (!entry.isDirectory() && !entry.isSymbolicLink()) {
-      continue;
-    }
-    const name = entry.name;
-    if (name === ".ohpm" || name.startsWith(".")) {
-      continue;
-    }
-
-    // Scoped package (e.g. @ohos) — descend one level.
-    if (name.startsWith("@")) {
-      const scopedDir = path.join(ohModulesDir, name);
-      let scopedEntries: fs.Dirent[] = [];
-      try {
-        scopedEntries = fs.readdirSync(scopedDir, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const sub of scopedEntries) {
-        if (!sub.isDirectory() && !sub.isSymbolicLink()) {
-          continue;
-        }
-        const pkgDir = path.join(scopedDir, sub.name);
-        const fullName = `${name}/${sub.name}`;
-        collectPackage(pkgDir, fullName, licensesMap, libsMap, selfModules);
-      }
-      continue;
-    }
-
-    const pkgDir = path.join(ohModulesDir, name);
-    collectPackage(pkgDir, name, licensesMap, libsMap, selfModules);
-  }
+  return { lib, licenses: resolved };
 }
 
 /**
  * Scan the project at projectRoot for OHPM dependencies and produce
  * OSSLibraries data.
  *
- * Looks at:
- *   - <projectRoot>/oh_modules
- *   - <projectRoot>/<module>/oh_modules (for every module dir)
+ * Every version of a dependency is listed as its own entry, sorted by name
+ * then semver. Duplicate name@version occurrences (e.g. the same package
+ * installed into several modules) are collected once.
  */
 export function scanProject(projectRoot: string, options?: ScanOptions): ScanResult {
   // Start from the defaults and extend with any caller-provided modules so
   // the host-project modules are never accidentally included.
-  const selfModules = new Set<string>(DEFAULT_SELF_MODULES);
+  const selfModules = new Set(DEFAULT_SELF_MODULES);
   for (const name of options?.selfModules ?? []) {
     selfModules.add(name);
   }
-  const licensesMap: Record<string, LicenseEntry> = {};
-  const libsMap: Record<string, LibraryEntry> = {};
 
-  scanOhModulesDir(path.join(projectRoot, "oh_modules"), licensesMap, libsMap, selfModules);
-
-  let rootEntries: fs.Dirent[] = [];
-  try {
-    rootEntries = fs.readdirSync(projectRoot, { withFileTypes: true });
-  } catch {
-    rootEntries = [];
-  }
-  for (const entry of rootEntries) {
-    if (!entry.isDirectory()) {
+  const built: { lib: LibraryEntry; licenses: LicenseEntry[] }[] = [];
+  for (const relativePath of findOhPackages(projectRoot)) {
+    const pkgDir = path.dirname(path.resolve(projectRoot, relativePath));
+    const pkg = readOhPackage(
+      path.join(pkgDir, "oh-package.json5"),
+      packageNameFromPath(relativePath),
+    );
+    if (!pkg || selfModules.has(pkg.name)) {
       continue;
     }
-    if (entry.name === "oh_modules" || entry.name.startsWith(".")) {
-      continue;
-    }
-    const modOhModules = path.join(projectRoot, entry.name, "oh_modules");
-    if (fs.existsSync(modOhModules)) {
-      scanOhModulesDir(modOhModules, licensesMap, libsMap, selfModules);
+    built.push(buildLibrary(pkg, pkgDir));
+  }
+
+  // First occurrence wins for duplicate name@version across modules.
+  const uniqueLibs = new Map<string, LibraryEntry>();
+  for (const { lib } of built) {
+    const key = `${lib.name}@${lib.artifactVersion}`;
+    if (!uniqueLibs.has(key)) {
+      uniqueLibs.set(key, lib);
     }
   }
 
-  const libraries = Object.keys(libsMap).map((k) => libsMap[k]);
-  libraries.sort((a, b) => {
-    const an = (a.name || "").toLowerCase();
-    const bn = (b.name || "").toLowerCase();
-    if (an < bn) return -1;
-    if (an > bn) return 1;
-    return 0;
-  });
+  // Licenses are deduplicated by content hash, so identical texts collapse
+  // into a single shared entry.
+  const licenses: Record<string, LicenseEntry> = {};
+  for (const { licenses: libLicenses } of built) {
+    for (const lic of libLicenses) {
+      licenses[lic.hash] ??= lic;
+    }
+  }
 
-  return { libraries, licenses: licensesMap };
+  return {
+    libraries: [...uniqueLibs.values()].sort(compareLibraries),
+    licenses,
+  };
+}
+
+/** Compare versions with semver when both are valid, string compare otherwise. */
+function compareVersions(a: string, b: string): number {
+  const va = semver.valid(a);
+  const vb = semver.valid(b);
+  return va && vb ? semver.compare(va, vb) : a.localeCompare(b);
+}
+
+/** Sort libraries by name, then by version. */
+function compareLibraries(a: LibraryEntry, b: LibraryEntry): number {
+  const byName = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  return byName !== 0 ? byName : compareVersions(a.artifactVersion, b.artifactVersion);
 }
 
 /** Serialize the scan result to OSSLibraries JSON. */
 export function serializeResult(result: ScanResult): string {
-  const out = {
-    libraries: result.libraries,
-    licenses: result.licenses,
-  };
-  return JSON.stringify(out);
+  return JSON.stringify({ libraries: result.libraries, licenses: result.licenses });
 }

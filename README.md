@@ -6,6 +6,12 @@ A Hvigor plugin to scan OHPM dependencies in a HarmonyOS project and generate li
 
 [中文文档](README_zh.md)
 
+## Features
+
+- **Proper SPDX expression parsing** — declarations such as `Apache-2.0 OR MIT` or `GPL-2.0-only WITH Classpath-exception-2.0` are parsed with `spdx-expression-parse`, so every license in an expression is listed; common misspellings are corrected via `spdx-correct`.
+- **Every version is listed** — when a dependency is installed at several versions, each version becomes its own entry instead of the first one silently winning.
+- **Complete license text** — text is read from the `LICENSE` file bundled in each HAR package, and falls back to the canonical SPDX text from `spdx-license-list` when no file is present.
+
 Install via npm:
 
 ```zsh

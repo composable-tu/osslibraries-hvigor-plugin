@@ -1,0 +1,134 @@
+/**
+ * Copyright (c) 2026 composable-tu
+ * OSSLibraries Hvigor Plugin is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ */
+
+import { mkdtempSync, writeFileSync, mkdirSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { parseOhPackage } from "../src/ohpm.js";
+import { scanProject, serializeResult } from "../src/scanner.js";
+
+function writePkg(root: string, relPath: string, content: string | object): void {
+  const abs = join(root, relPath);
+  mkdirSync(join(abs, ".."), { recursive: true });
+  writeFileSync(abs, typeof content === "string" ? content : JSON.stringify(content));
+}
+
+let root: string;
+
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), "ossl-test-"));
+});
+
+describe("parseOhPackage", () => {
+  it("normalizes loosely-typed fields", () => {
+    const pkg = parseOhPackage({
+      name: "foo",
+      version: "1.0.0",
+      author: { name: "Alice", email: "a@b.c" },
+      repository: { url: "https://github.com/x/foo" },
+      license: ["MIT", "Apache-2.0"],
+    });
+    expect(pkg.authorName).toBe("Alice");
+    expect(pkg.repoUrl).toBe("https://github.com/x/foo");
+    expect(pkg.licenseDecls).toEqual(["MIT", "Apache-2.0"]);
+  });
+});
+
+describe("scanProject", () => {
+  it("lists every version of a dependency side by side", () => {
+    writePkg(root, "oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "1.0.0",
+      license: "MIT",
+    });
+    writePkg(root, "entry/oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "2.0.0",
+      license: "MIT",
+    });
+
+    const { libraries } = scanProject(root);
+    const foo = libraries.filter((l) => l.name === "foo");
+    expect(foo.map((l) => l.artifactVersion)).toEqual(["1.0.0", "2.0.0"]);
+  });
+
+  it("deduplicates identical name@version", () => {
+    writePkg(root, "oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "1.0.0",
+      license: "MIT",
+    });
+    writePkg(root, "entry/oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "1.0.0",
+      license: "MIT",
+    });
+
+    const { libraries } = scanProject(root);
+    expect(libraries.filter((l) => l.name === "foo")).toHaveLength(1);
+  });
+
+  it("prefers the bundled LICENSE file and hashes its text", () => {
+    writePkg(root, "oh_modules/baz/oh-package.json5", {
+      name: "baz",
+      version: "1.2.3",
+      license: "MIT",
+    });
+    writePkg(root, "oh_modules/baz/LICENSE", "CUSTOM LICENSE TEXT");
+
+    const { libraries, licenses } = scanProject(root);
+    const baz = libraries.find((l) => l.name === "baz")!;
+    expect(baz.licenses[0]).not.toBe("MIT");
+    expect(licenses[baz.licenses[0]].content).toBe("CUSTOM LICENSE TEXT");
+  });
+
+  it("excludes host-project modules via selfModules", () => {
+    writePkg(root, "oh_modules/entry/oh-package.json5", {
+      name: "entry",
+      version: "1.0.0",
+      license: "MIT",
+    });
+    writePkg(root, "oh_modules/lib/oh-package.json5", {
+      name: "lib",
+      version: "1.0.0",
+      license: "MIT",
+    });
+
+    const { libraries } = scanProject(root, { selfModules: new Set(["entry"]) });
+    expect(libraries.map((l) => l.name)).not.toContain("entry");
+    expect(libraries.map((l) => l.name)).toContain("lib");
+  });
+
+  it("handles scoped packages", () => {
+    writePkg(root, "oh_modules/@scope/bar/oh-package.json5", {
+      name: "@scope/bar",
+      version: "0.3.1",
+      license: "MIT",
+    });
+
+    const { libraries } = scanProject(root);
+    expect(libraries.map((l) => l.name)).toEqual(["@scope/bar"]);
+  });
+
+  it("serializes into the OSSLibraries JSON shape", () => {
+    writePkg(root, "oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "1.0.0",
+      license: "MIT",
+    });
+
+    const json = JSON.parse(serializeResult(scanProject(root)));
+    expect(Object.keys(json).sort()).toEqual(["libraries", "licenses"]);
+    expect(json.libraries).toHaveLength(1);
+  });
+});
