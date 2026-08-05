@@ -32,6 +32,12 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
 
+      - uses: voidzero-dev/setup-vp@v1
+        if: steps.check.outputs.should_publish == 'true'
+        with:
+          node-version: 26
+          cache: true
+
       - uses: pnpm/action-setup@v6
         if: steps.check.outputs.should_publish == 'true'
         with:
