@@ -52,6 +52,14 @@ describe("resolveLicense", () => {
     expect(resolveLicense("apache2").map((l) => l.spdxId)).toEqual(["Apache-2.0"]);
   });
 
+  it("falls back to spdx-correct for malformed SPDX expressions", () => {
+    // "MIT OR" is not a valid SPDX expression (parseExpression throws on the
+    // dangling operator), but spdx-correct can still recover "MIT" from it.
+    const [lic] = resolveLicense("MIT OR");
+    expect(lic.spdxId).toBe("MIT");
+    expect(lic.hash).toBe("MIT");
+  });
+
   it("returns an empty array for non-string declarations", () => {
     expect(resolveLicense(undefined as any)).toEqual([]);
     expect(resolveLicense(null as any)).toEqual([]);
