@@ -1,6 +1,6 @@
 {
   "name": "osslibraries-hvigor-plugin",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A Hvigor plugin that scans OHPM dependencies of HarmonyOS projects and generates license metadata for the OSSLibraries library.",
   "homepage": "https://github.com/composable-tu/osslibraries-hvigor-plugin#readme",
   "bugs": {
@@ -12,6 +12,9 @@
     "type": "git",
     "url": "git+https://github.com/composable-tu/osslibraries-hvigor-plugin.git"
   },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "main": "dist/index.cjs",
   "types": "dist/index.d.cts",

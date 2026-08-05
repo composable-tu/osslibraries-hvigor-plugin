@@ -478,5 +478,5 @@ export function serializeResult(result: ScanResult): string {
     libraries: result.libraries,
     licenses: result.licenses,
   };
-  return JSON.stringify(out, null, 2);
+  return JSON.stringify(out);
 }

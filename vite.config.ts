@@ -8,8 +8,11 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
   },
   pack: {
-    dts: true,
+    dts: {
+      tsgo: true,
+    },
     format: ["esm", "cjs"],
     sourcemap: true,
+    minify: true,
   },
 });
