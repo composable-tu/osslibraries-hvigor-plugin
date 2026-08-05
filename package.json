@@ -35,7 +35,10 @@
   },
   "scripts": {
     "build": "vp pack",
-    "prepare": "vp pack"
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
   },
   "dependencies": {
     "fast-glob": "^3.3.3",
