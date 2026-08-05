@@ -145,7 +145,37 @@ describe("scanProject", () => {
     });
 
     const json = JSON.parse(serializeResult(scanProject(root)));
+
+    // Top-level shape
     expect(Object.keys(json).sort()).toEqual(["libraries", "licenses"]);
+    expect(Array.isArray(json.libraries)).toBe(true);
     expect(json.libraries).toHaveLength(1);
+    expect(typeof json.licenses).toBe("object");
+
+    const [library] = json.libraries;
+    expect(library).toBeDefined();
+
+    // libraries[0].licenses is an array of hash strings
+    expect(Array.isArray(library.licenses)).toBe(true);
+    expect(library.licenses.length).toBeGreaterThan(0);
+
+    for (const hash of library.licenses) {
+      // Each hash is a string
+      expect(typeof hash).toBe("string");
+
+      // Each hash exists in the licenses map
+      expect(json.licenses).toHaveProperty(hash);
+
+      const license = json.licenses[hash];
+
+      // Each license object has the expected fields
+      expect(license).toEqual(
+        expect.objectContaining({
+          hash,
+          name: expect.any(String),
+          content: expect.any(String),
+        }),
+      );
+    }
   });
 });
