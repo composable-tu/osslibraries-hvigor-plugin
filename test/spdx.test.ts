@@ -52,6 +52,11 @@ describe("resolveLicense", () => {
     expect(resolveLicense("apache2").map((l) => l.spdxId)).toEqual(["Apache-2.0"]);
   });
 
+  it("returns an empty array for non-string declarations", () => {
+    expect(resolveLicense(undefined as any)).toEqual([]);
+    expect(resolveLicense(null as any)).toEqual([]);
+  });
+
   it("keeps a minimal entry for unknown declarations", () => {
     const [lic] = resolveLicense("Custom Proprietary License");
     expect(lic.spdxId).toBe("");
