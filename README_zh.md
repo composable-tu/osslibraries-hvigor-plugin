@@ -8,9 +8,11 @@
 
 ## 特性
 
-- **规范的 SPDX 表达式解析** — 诸如 `Apache-2.0 OR MIT` 或 `GPL-2.0-only WITH Classpath-exception-2.0` 的声明会通过 `spdx-expression-parse` 解析，表达式中的每个许可证都会被列出；常见拼写错误会通过 `spdx-correct` 自动纠正。
-- **列出每个版本** — 当依赖以多个版本安装时，每个版本都会成为独立的条目，而不是静默地只保留第一个。
-- **完整的许可证文本** — 优先读取 HAR 包内自带的 `LICENSE` 文件；没有该文件时，回退使用 `spdx-license-list` 中的 SPDX 规范文本。
+- **开箱即用** — 注册一次插件，每次构建自动从 `oh_modules/` 重新生成 License 列表，输出始终与实际发布的依赖保持一致。
+- **构建期集成** — 作为 Hvigor 任务运行，将 `osslibraries.json` 写入 entry 模块的 `rawfile/` 目录，随 HAP 打包，运行时即可读取。
+- **精准 License 识别** — 完整解析 `Apache-2.0 OR MIT` 等 SPDX 表达式，自动纠正拼写错误，表达式中的每个许可证均被列出。
+- **完整 License 文本** — 优先读取包内自带的 `LICENSE` 文件，缺失时自动回退到 SPDX 规范文本。
+- **多版本依赖处理** — 同一依赖安装了多个版本，每个版本独立列出，并各自携带对应的 License。
 
 ## 使用
 
