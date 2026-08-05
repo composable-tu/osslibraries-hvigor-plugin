@@ -92,6 +92,23 @@ describe("scanProject", () => {
     expect(licenses[baz.licenses[0]].content).toBe("CUSTOM LICENSE TEXT");
   });
 
+  it("synthesizes a License entry when no license field is declared", () => {
+    writePkg(root, "oh_modules/qux/oh-package.json5", {
+      name: "qux",
+      version: "1.0.0",
+    });
+    writePkg(root, "oh_modules/qux/LICENSE", "CUSTOM LICENSE TEXT");
+
+    const { libraries, licenses } = scanProject(root);
+    const qux = libraries.find((l) => l.name === "qux")!;
+    expect(qux.licenses).toHaveLength(1);
+
+    const licenseEntry = licenses[qux.licenses[0]];
+    expect(licenseEntry.name).toBe("License");
+    expect(licenseEntry.content).toBe("CUSTOM LICENSE TEXT");
+    expect(licenseEntry.hash).toBeTruthy();
+  });
+
   it("excludes host-project modules via selfModules", () => {
     writePkg(root, "oh_modules/entry/oh-package.json5", {
       name: "entry",

@@ -57,7 +57,10 @@ function findOhPackages(projectRoot: string): string[] {
 
 /** Derive the package name from its relative path: "@scope/bar" or "foo". */
 function packageNameFromPath(relativePath: string): string {
-  const parts = relativePath.split(path.sep);
+  // fast-glob always returns POSIX-style paths regardless of platform, so
+  // split on "/" rather than path.sep (which would be "\\" on Windows and
+  // fail to segment the glob result).
+  const parts = relativePath.split("/");
   const idx = parts.indexOf("oh_modules");
   const next = parts[idx + 1];
   if (next?.startsWith("@")) {
