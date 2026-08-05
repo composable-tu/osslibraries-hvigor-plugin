@@ -94,9 +94,15 @@ export function resolveLicense(declaration: string): LicenseEntry[] {
     return [];
   }
 
-  // Valid SPDX expression first — handles OR/AND/WITH correctly.
+  // Valid SPDX expression first — handles OR/AND/WITH correctly. Each token
+  // is run through spdx-correct so minor misspellings (e.g. lowercase "mit")
+  // inside a valid expression are still normalized without losing the
+  // expression structure.
   try {
-    return collectLicenseIds(parseExpression(trimmed)).map(licenseEntryFor);
+    return collectLicenseIds(parseExpression(trimmed)).map((id) => {
+      const corrected = correct(id) ?? id;
+      return licenseEntryFor(corrected);
+    });
   } catch {
     // Not a valid SPDX expression — fall through.
   }

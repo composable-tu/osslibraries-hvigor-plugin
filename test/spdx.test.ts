@@ -48,6 +48,17 @@ describe("resolveLicense", () => {
     expect(licenses.map((l) => l.spdxId)).toContain("Classpath-exception-2.0");
   });
 
+  it("preserves WITH exceptions that spdx-correct does not recognize", () => {
+    // spdx-correct returns null for SPDX exception ids (e.g.
+    // Classpath-exception-2.0); the resolver must fall back to the original
+    // token rather than dropping it.
+    const licenses = resolveLicense("GPL-2.0-only WITH Classpath-exception-2.0");
+    expect(licenses.map((l) => l.spdxId)).toEqual([
+      "GPL-2.0-only",
+      "Classpath-exception-2.0",
+    ]);
+  });
+
   it("corrects common misspellings via spdx-correct", () => {
     expect(resolveLicense("apache2").map((l) => l.spdxId)).toEqual(["Apache-2.0"]);
   });

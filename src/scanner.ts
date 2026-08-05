@@ -186,9 +186,16 @@ export function scanProject(projectRoot: string, options?: ScanOptions): ScanRes
   }
 
   // Licenses are deduplicated by content hash, so identical texts collapse
-  // into a single shared entry.
+  // into a single shared entry. Only licenses belonging to the kept
+  // (first-occurrence) library entries are emitted, so duplicate
+  // name@version occurrences dropped above don't leave stale hashes in the
+  // output map.
   const licenses: Record<string, LicenseEntry> = {};
-  for (const { licenses: libLicenses } of built) {
+  for (const { lib, licenses: libLicenses } of built) {
+    const key = `${lib.name}@${lib.artifactVersion}`;
+    if (uniqueLibs.get(key) !== lib) {
+      continue;
+    }
     for (const lic of libLicenses) {
       licenses[lic.hash] ??= lic;
     }

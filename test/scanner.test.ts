@@ -12,14 +12,14 @@
 
 import { mkdtempSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { parseOhPackage } from "../src/ohpm.js";
 import { scanProject, serializeResult } from "../src/scanner.js";
 
 function writePkg(root: string, relPath: string, content: string | object): void {
   const abs = join(root, relPath);
-  mkdirSync(join(abs, ".."), { recursive: true });
+  mkdirSync(dirname(abs), { recursive: true });
   writeFileSync(abs, typeof content === "string" ? content : JSON.stringify(content));
 }
 
@@ -62,6 +62,36 @@ describe("scanProject", () => {
     expect(foo.map((l) => l.artifactVersion)).toEqual(["1.0.0", "2.0.0"]);
   });
 
+  it("keeps distinct licenses for different versions of the same package", () => {
+    // Same package name, different versions, different bundled LICENSE text.
+    // Both versions must be kept AND each must surface its own license text.
+    writePkg(root, "oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "1.0.0",
+      license: "MIT",
+    });
+    writePkg(root, "oh_modules/foo/LICENSE", "VERSION ONE LICENSE");
+    writePkg(root, "entry/oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "2.0.0",
+      license: "MIT",
+    });
+    writePkg(root, "entry/oh_modules/foo/LICENSE", "VERSION TWO LICENSE");
+
+    const { libraries, licenses } = scanProject(root);
+    const foo = libraries.filter((l) => l.name === "foo");
+    expect(foo.map((l) => l.artifactVersion)).toEqual(["1.0.0", "2.0.0"]);
+
+    const v1 = foo.find((l) => l.artifactVersion === "1.0.0")!;
+    const v2 = foo.find((l) => l.artifactVersion === "2.0.0")!;
+    expect(v1.licenses).toHaveLength(1);
+    expect(v2.licenses).toHaveLength(1);
+    expect(v1.licenses[0]).not.toBe(v2.licenses[0]);
+
+    expect(licenses[v1.licenses[0]].content).toBe("VERSION ONE LICENSE");
+    expect(licenses[v2.licenses[0]].content).toBe("VERSION TWO LICENSE");
+  });
+
   it("deduplicates identical name@version", () => {
     writePkg(root, "oh_modules/foo/oh-package.json5", {
       name: "foo",
@@ -76,6 +106,36 @@ describe("scanProject", () => {
 
     const { libraries } = scanProject(root);
     expect(libraries.filter((l) => l.name === "foo")).toHaveLength(1);
+  });
+
+  it("does not emit licenses from dropped duplicate name@version", () => {
+    // Two occurrences of foo@1.0.0, each bundling a different LICENSE file.
+    // The first occurrence wins in uniqueLibs; the second one's license
+    // hash must NOT leak into the licenses map.
+    writePkg(root, "oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "1.0.0",
+      license: "MIT",
+    });
+    writePkg(root, "oh_modules/foo/LICENSE", "FIRST LICENSE TEXT");
+    writePkg(root, "entry/oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "1.0.0",
+      license: "MIT",
+    });
+    writePkg(root, "entry/oh_modules/foo/LICENSE", "SECOND LICENSE TEXT");
+
+    const { libraries, licenses } = scanProject(root);
+    const foo = libraries.find((l) => l.name === "foo")!;
+    expect(foo.licenses).toHaveLength(1);
+
+    const referencedHash = foo.licenses[0];
+    expect(licenses[referencedHash].content).toBe("FIRST LICENSE TEXT");
+
+    // No stale entry for the dropped duplicate's license text.
+    const allHashes = Object.keys(licenses);
+    expect(allHashes).toHaveLength(1);
+    expect(allHashes[0]).toBe(referencedHash);
   });
 
   it("prefers the bundled LICENSE file and hashes its text", () => {
