@@ -41,7 +41,7 @@ export interface LibraryEntry {
   scm: { connection: string; developerConnection: string; url: string } | null;
   organization: unknown;
   funding: unknown[];
-  tag: string;
+  tag: string[];
   licenses: string[];
 }
 
@@ -70,7 +70,11 @@ export interface OhPackage {
   description: string;
   homepage: string;
   authorName: string;
+  /** URL extracted from the author object (e.g. { name, url }). */
+  authorUrl: string;
   repoUrl: string;
   /** Raw license declarations, e.g. "Apache-2.0" or "Apache-2.0 OR MIT". */
   licenseDecls: string[];
+  /** Raw keyword list from the manifest. The comma-separated tag is derived in `buildLibrary`. */
+  keywords: string[];
 }

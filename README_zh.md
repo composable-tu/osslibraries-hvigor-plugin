@@ -32,7 +32,7 @@ vlt install osslibraries-hvigor-plugin -D
 bun add osslibraries-hvigor-plugin -D
 ```
 
-然后编辑 `entry/hvigorfile.ts` 以注册插件:
+然后编辑 `entry/hvigorfile.ts` 以注册插件（也可以自定义载入哪个模块，这里仅以 `entry` 举例）:
 
 ```TS
 import { hapTasks } from '@ohos/hvigor-ohos-plugin';
@@ -45,7 +45,7 @@ export default {
 ```
 
 > [!TIP]
-> 如果你的项目有不想出现在 License 列表中的模块，可以将依赖名传入 `selfModules`:
+> 如果项目中有不想出现在 License 列表中的模块，可将依赖名传入 `selfModules`（注册插件的模块总是自动排除）:
 >
 > ```ts
 > plugins: [ossScanPlugin({ selfModules: ["mylibrary", "3rdlibrary"] })];

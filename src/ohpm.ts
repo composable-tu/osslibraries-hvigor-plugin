@@ -34,13 +34,21 @@ function str(obj: Record<string, unknown>, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/** Author may be a string or an object `{ name, email }`. */
+/** Author may be a string or an object `{ name, email, url }`. */
 function authorName(raw: unknown): string | undefined {
   if (typeof raw === "string") {
     return raw;
   }
   if (isRecord(raw)) {
     return str(raw, "name");
+  }
+  return undefined;
+}
+
+/** Extract the URL from an author object, when present. */
+function authorUrl(raw: unknown): string | undefined {
+  if (isRecord(raw)) {
+    return str(raw, "url");
   }
   return undefined;
 }
@@ -67,6 +75,14 @@ function licenseDecls(raw: unknown): string[] {
   return [];
 }
 
+/** Extract a string array field, returning empty when absent or non-array. */
+function stringArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((item): item is string => typeof item === "string");
+  }
+  return [];
+}
+
 /** Parse a JSON5 string into a plain object (empty object on non-object input). */
 export function parseJson5(text: string): Record<string, unknown> {
   const parsed: unknown = JSON5.parse(text);
@@ -75,14 +91,17 @@ export function parseJson5(text: string): Record<string, unknown> {
 
 /** Convert a raw oh-package.json5 object into the strict `OhPackage` model. */
 export function parseOhPackage(obj: Record<string, unknown>): OhPackage {
+  const rawAuthor = obj["author"];
   return {
     name: str(obj, "name") ?? "",
     version: str(obj, "version") ?? "",
     description: str(obj, "description") ?? "",
     homepage: str(obj, "homepage") ?? "",
-    authorName: authorName(obj["author"]) ?? "",
+    authorName: authorName(rawAuthor) ?? "",
+    authorUrl: authorUrl(rawAuthor) ?? "",
     repoUrl: repoUrl(obj["repository"]) ?? "",
     licenseDecls: licenseDecls(obj["license"]),
+    keywords: stringArray(obj["keywords"]),
   };
 }
 

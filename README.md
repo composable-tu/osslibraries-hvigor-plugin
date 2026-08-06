@@ -32,7 +32,7 @@ vlt install osslibraries-hvigor-plugin -D
 bun add osslibraries-hvigor-plugin -D
 ```
 
-Then edit `entry/hvigorfile.ts` to register the plugin:
+Then edit `entry/hvigorfile.ts` to register the plugin (the target module can be customized; `entry` is used here as an example):
 
 ```TS
 import { hapTasks } from '@ohos/hvigor-ohos-plugin';
@@ -45,7 +45,7 @@ export default {
 ```
 
 > [!TIP]
-> If you have modules that should not appear in the license list, pass their dependency names to `selfModules`:
+> If you have modules that should not appear in the license list, pass their names to `selfModules` (the module the plugin is registered on is always excluded automatically):
 >
 > ```ts
 > plugins: [ossScanPlugin({ selfModules: ["mylibrary", "3rdlibrary"] })];
