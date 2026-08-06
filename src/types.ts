@@ -41,7 +41,7 @@ export interface LibraryEntry {
   scm: { connection: string; developerConnection: string; url: string } | null;
   organization: unknown;
   funding: unknown[];
-  tag: string;
+  tag: string[];
   licenses: string[];
 }
 

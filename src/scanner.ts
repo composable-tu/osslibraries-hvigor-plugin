@@ -140,7 +140,7 @@ export function buildLibrary(
     scm: pkg.repoUrl ? { connection: "", developerConnection: "", url: pkg.repoUrl } : null,
     organization: null,
     funding: [],
-    tag: pkg.keywords.join(", "),
+    tag: pkg.keywords,
     licenses: [...new Set(resolved.map((l) => l.hash))],
   };
 
