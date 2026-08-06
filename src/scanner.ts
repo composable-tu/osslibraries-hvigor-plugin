@@ -136,11 +136,11 @@ export function buildLibrary(
     name: pkg.name,
     description: pkg.description,
     website: pkg.homepage,
-    developers: pkg.authorName ? [{ name: pkg.authorName, organisationUrl: "" }] : [],
+    developers: pkg.authorName ? [{ name: pkg.authorName, organisationUrl: pkg.authorUrl }] : [],
     scm: pkg.repoUrl ? { connection: "", developerConnection: "", url: pkg.repoUrl } : null,
     organization: null,
     funding: [],
-    tag: "",
+    tag: pkg.keywords.join(", "),
     licenses: [...new Set(resolved.map((l) => l.hash))],
   };
 

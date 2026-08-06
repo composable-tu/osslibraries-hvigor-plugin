@@ -34,13 +34,26 @@ describe("parseOhPackage", () => {
     const pkg = parseOhPackage({
       name: "foo",
       version: "1.0.0",
-      author: { name: "Alice", email: "a@b.c" },
+      author: { name: "Alice", email: "a@b.c", url: "https://alice.dev" },
       repository: { url: "https://github.com/x/foo" },
       license: ["MIT", "Apache-2.0"],
+      keywords: ["oss", "license"],
     });
     expect(pkg.authorName).toBe("Alice");
+    expect(pkg.authorUrl).toBe("https://alice.dev");
     expect(pkg.repoUrl).toBe("https://github.com/x/foo");
     expect(pkg.licenseDecls).toEqual(["MIT", "Apache-2.0"]);
+    expect(pkg.keywords).toEqual(["oss", "license"]);
+  });
+
+  it("handles string-only author (no url)", () => {
+    const pkg = parseOhPackage({
+      name: "bar",
+      version: "1.0.0",
+      author: "composable-tu",
+    });
+    expect(pkg.authorName).toBe("composable-tu");
+    expect(pkg.authorUrl).toBe("");
   });
 });
 

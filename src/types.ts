@@ -70,7 +70,11 @@ export interface OhPackage {
   description: string;
   homepage: string;
   authorName: string;
+  /** URL extracted from the author object (e.g. { name, url }). */
+  authorUrl: string;
   repoUrl: string;
   /** Raw license declarations, e.g. "Apache-2.0" or "Apache-2.0 OR MIT". */
   licenseDecls: string[];
+  /** Keywords from the manifest, joined as a comma-separated tag. */
+  keywords: string[];
 }

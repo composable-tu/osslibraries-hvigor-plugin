@@ -32,7 +32,7 @@ vlt install osslibraries-hvigor-plugin -D
 bun add osslibraries-hvigor-plugin -D
 ```
 
-然后编辑 `entry/hvigorfile.ts` 以注册插件:
+然后编辑 `entry/hvigorfile.ts` 以注册插件（也可以自定义载入哪个模块，这里仅以 `entry` 举例）:
 
 ```TS
 import { hapTasks } from '@ohos/hvigor-ohos-plugin';
