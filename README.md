@@ -45,7 +45,7 @@ export default {
 ```
 
 > [!TIP]
-> If you have modules that should not appear in the license list, pass their dependency names to `selfModules`:
+> If you have modules that should not appear in the license list, pass their names to `selfModules` (the module the plugin is registered on is always excluded automatically):
 >
 > ```ts
 > plugins: [ossScanPlugin({ selfModules: ["mylibrary", "3rdlibrary"] })];

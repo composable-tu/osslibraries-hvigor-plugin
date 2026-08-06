@@ -11,10 +11,10 @@
  */
 
 interface SpdxLicenseInfo {
-    readonly name: string;
-    readonly url: string;
-    readonly osiApproved: boolean;
-    readonly licenseText: string;
+  readonly name: string;
+  readonly url: string;
+  readonly osiApproved: boolean;
+  readonly licenseText: string;
 }
 
 declare module "spdx-license-list/full" {

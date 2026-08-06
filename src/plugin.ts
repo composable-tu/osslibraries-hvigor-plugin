@@ -33,12 +33,12 @@ import { scanProject, serializeResult } from "./scanner.js";
 export interface OssScanPluginOptions {
   /**
    * Module names that belong to the host project and must NOT appear in the
-   * generated license list. Defaults to the OSSLibraries own modules plus
-   * 'entry'. Add your own module names here.
+   * generated license list. The module the plugin is registered on is always
+   * excluded automatically; add your other module names here.
    */
   selfModules?: string[];
   /**
-   * Relative path (from the entry module path) to the output JSON file.
+   * Relative path (from the module path) to the output JSON file.
    * Defaults to 'src/main/resources/rawfile/osslibraries.json'.
    */
   outputFile?: string;
@@ -58,13 +58,8 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
   return {
     pluginId: PLUGIN_ID,
     apply: (node: HvigorNode) => {
-      const nodeName = node.getNodeName();
-      // Only register on the entry module node.
-      if (nodeName !== "entry") {
-        return;
-      }
-
       const modulePath = node.getNodePath();
+      const moduleName = node.getNodeName();
       const projectRoot = path.resolve(modulePath, "..");
 
       const rawfileDir = path.join(modulePath, "src", "main", "resources", "rawfile");
@@ -72,7 +67,9 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
         ? path.resolve(modulePath, options.outputFile)
         : path.join(rawfileDir, "osslibraries.json");
 
-      const selfModules = options?.selfModules ? new Set<string>(options.selfModules) : undefined;
+      // Always exclude the module the plugin is registered on.
+      const selfModules = new Set<string>(options?.selfModules ?? []);
+      selfModules.add(moduleName);
 
       node.registerTask({
         name: TASK_NAME,
@@ -88,9 +85,7 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
           fs.writeFileSync(outputFile, json, "utf-8");
           console.log(`[osslibraries] wrote ${result.libraries.length} libraries to ${outputFile}`);
         },
-        // No dependencies — this task runs first.
         dependencies: [],
-        // CompileArkTS must run AFTER our scan, so list it as a post-dependency.
         postDependencies: ["default@CompileArkTS"],
       });
     },

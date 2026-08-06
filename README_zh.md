@@ -45,7 +45,7 @@ export default {
 ```
 
 > [!TIP]
-> 如果你的项目有不想出现在 License 列表中的模块，可以将依赖名传入 `selfModules`:
+> 如果项目中有不想出现在 License 列表中的模块，可将依赖名传入 `selfModules`（注册插件的模块总是自动排除）:
 >
 > ```ts
 > plugins: [ossScanPlugin({ selfModules: ["mylibrary", "3rdlibrary"] })];
