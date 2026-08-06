@@ -75,6 +75,6 @@ export interface OhPackage {
   repoUrl: string;
   /** Raw license declarations, e.g. "Apache-2.0" or "Apache-2.0 OR MIT". */
   licenseDecls: string[];
-  /** Keywords from the manifest, joined as a comma-separated tag. */
+  /** Raw keyword list from the manifest. The comma-separated tag is derived in `buildLibrary`. */
   keywords: string[];
 }

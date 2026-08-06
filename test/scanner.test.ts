@@ -55,6 +55,16 @@ describe("parseOhPackage", () => {
     expect(pkg.authorName).toBe("composable-tu");
     expect(pkg.authorUrl).toBe("");
   });
+
+  it("handles author object without url", () => {
+    const pkg = parseOhPackage({
+      name: "baz",
+      version: "1.0.0",
+      author: { name: "Alice" },
+    });
+    expect(pkg.authorName).toBe("Alice");
+    expect(pkg.authorUrl).toBe("");
+  });
 });
 
 describe("scanProject", () => {
