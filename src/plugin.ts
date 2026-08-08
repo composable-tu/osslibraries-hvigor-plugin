@@ -27,7 +27,8 @@
 import * as path from "path";
 import * as fs from "fs";
 import type { HvigorNode, HvigorPlugin } from "@ohos/hvigor";
-import { scanProject, serializeResult } from "./scanner.js";
+import { scanProject } from "./scanner.js";
+import { getSerializer, type OutputFormat } from "./format.js";
 
 /** Options for the OSS Libraries scan plugin. */
 export interface OssScanPluginOptions {
@@ -38,10 +39,17 @@ export interface OssScanPluginOptions {
    */
   selfModules?: string[];
   /**
-   * Relative path (from the module path) to the output JSON file.
-   * Defaults to 'src/main/resources/rawfile/osslibraries.json'.
+   * Relative path (from the module path) to the output file. When omitted,
+   * defaults to 'src/main/resources/rawfile/osslibraries.<ext>', where
+   * <ext> follows `format` ("json" or "msgpack").
    */
   outputFile?: string;
+  /**
+   * Output format for the generated license metadata.
+   * - "json" (default): human-readable JSON.
+   * - "message-pack": compact binary MessagePack.
+   */
+  format?: OutputFormat;
 }
 
 const PLUGIN_ID = "osslibraries_scan_plugin";
@@ -62,10 +70,15 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
       const moduleName = node.getNodeName();
       const projectRoot = path.resolve(modulePath, "..");
 
+      const format: OutputFormat = options?.format ?? "json";
+      const serializer = getSerializer(format);
+
       const rawfileDir = path.join(modulePath, "src", "main", "resources", "rawfile");
+      // An explicit outputFile wins as-is; otherwise the extension follows
+      // the chosen format ("json" or "msgpack").
       const outputFile = options?.outputFile
         ? path.resolve(modulePath, options.outputFile)
-        : path.join(rawfileDir, "osslibraries.json");
+        : path.join(rawfileDir, `osslibraries.${serializer.extension}`);
 
       // Always exclude the module the plugin is registered on.
       const selfModules = new Set<string>(options?.selfModules ?? []);
@@ -76,14 +89,16 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
         run: () => {
           console.log(`[osslibraries] scanning OHPM dependencies at ${projectRoot}`);
           const result = scanProject(projectRoot, { selfModules });
-          const json = serializeResult(result);
+          const bytes = serializer.encode(result);
 
           const outDir = path.dirname(outputFile);
           if (!fs.existsSync(outDir)) {
             fs.mkdirSync(outDir, { recursive: true });
           }
-          fs.writeFileSync(outputFile, json, "utf-8");
-          console.log(`[osslibraries] wrote ${result.libraries.length} libraries to ${outputFile}`);
+          fs.writeFileSync(outputFile, bytes);
+          console.log(
+            `[osslibraries] wrote ${result.libraries.length} libraries to ${outputFile} (${serializer.name})`,
+          );
         },
         dependencies: [],
         postDependencies: ["default@CompileArkTS"],

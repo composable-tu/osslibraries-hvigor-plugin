@@ -51,4 +51,21 @@ export default {
 > plugins: [ossScanPlugin({ selfModules: ["mylibrary", "3rdlibrary"] })];
 > ```
 
-On each build, the plugin scans `oh_modules/` and generates `entry/src/main/resources/rawfile/osslibraries.json`.
+## Configuration
+
+### `format`
+
+Output format for the generated license metadata (default `"json"`).
+
+| Value            | Output file            | Description                    |
+| ---------------- | ---------------------- | ------------------------------ |
+| `"json"`         | `osslibraries.json`    | Human-readable JSON (default). |
+| `"message-pack"` | `osslibraries.msgpack` | Compact binary MessagePack.    |
+
+```ts
+plugins: [ossScanPlugin({ format: "message-pack" })];
+```
+
+The output file extension follows `format` unless you set `outputFile` explicitly.
+
+On each build, the plugin scans `oh_modules/` and generates `entry/src/main/resources/rawfile/osslibraries.<ext>` (`osslibraries.json` by default).
