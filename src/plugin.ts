@@ -45,9 +45,11 @@ export interface OssScanPluginOptions {
    */
   outputFile?: string;
   /**
-   * Output format for the generated license metadata.
-   * - "json" (default): human-readable JSON.
-   * - "message-pack": compact binary MessagePack.
+   * Output format for the generated license metadata. Defaults to
+   * `OutputFormat.JSON`.
+   *
+   * Prefer the `OutputFormat` enum members (e.g. `OutputFormat.MessagePack`)
+   * over raw strings for safe renames and autocompletion.
    */
   format?: OutputFormat;
 }
@@ -70,7 +72,7 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
       const moduleName = node.getNodeName();
       const projectRoot = path.resolve(modulePath, "..");
 
-      const format: OutputFormat = options?.format ?? "json";
+      const format = options?.format ?? "json";
       const serializer = getSerializer(format);
 
       const rawfileDir = path.join(modulePath, "src", "main", "resources", "rawfile");

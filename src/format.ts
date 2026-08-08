@@ -21,8 +21,21 @@ import { encode as encodeMsgPack } from "@msgpack/msgpack";
 import { toOutputObject } from "./scanner.js";
 import type { ScanResult } from "./types.js";
 
-/** Supported output formats for the generated license metadata. */
-export type OutputFormat = "json" | "message-pack";
+/**
+ * Supported output formats for the generated license metadata.
+ *
+ * Prefer the enum members over raw strings so renames and autocompletion
+ * stay safe.
+ */
+export const OutputFormat = {
+  /** Human-readable JSON (default). */
+  JSON: "json",
+  /** Compact binary MessagePack. */
+  MessagePack: "message-pack",
+} as const;
+
+/** Union of all valid format values, derived from `OutputFormat`. */
+export type OutputFormat = (typeof OutputFormat)[keyof typeof OutputFormat];
 
 /**
  * Converts a `ScanResult` into the byte representation of a given format and
@@ -52,8 +65,8 @@ const messagePackSerializer: Serializer = {
 };
 
 const SERIALIZERS: Record<OutputFormat, Serializer> = {
-  json: jsonSerializer,
-  "message-pack": messagePackSerializer,
+  [OutputFormat.JSON]: jsonSerializer,
+  [OutputFormat.MessagePack]: messagePackSerializer,
 };
 
 /**

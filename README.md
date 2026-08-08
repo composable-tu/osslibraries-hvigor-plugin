@@ -63,9 +63,11 @@ Output format for the generated license metadata (default `"json"`).
 | `"message-pack"` | `osslibraries.msgpack` | Compact binary MessagePack.    |
 
 ```ts
-plugins: [ossScanPlugin({ format: "message-pack" })];
+import { ossScanPlugin, OutputFormat } from "osslibraries-hvigor-plugin";
+
+plugins: [ossScanPlugin({ format: OutputFormat.MessagePack })];
 ```
 
-The output file extension follows `format` unless you set `outputFile` explicitly.
+The `OutputFormat` enum is the recommended way to set the format. Raw strings (`"json"`, `"message-pack"`) are also accepted. The output file extension follows `format` unless you set `outputFile` explicitly.
 
 On each build, the plugin scans `oh_modules/` and generates `entry/src/main/resources/rawfile/osslibraries.<ext>` (`osslibraries.json` by default).

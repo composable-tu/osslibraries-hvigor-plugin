@@ -63,9 +63,11 @@ export default {
 | `"message-pack"` | `osslibraries.msgpack` | 紧凑二进制 MessagePack。 |
 
 ```ts
-plugins: [ossScanPlugin({ format: "message-pack" })];
+import { ossScanPlugin, OutputFormat } from "osslibraries-hvigor-plugin";
+
+plugins: [ossScanPlugin({ format: OutputFormat.MessagePack })];
 ```
 
-输出文件扩展名随 `format` 而定，除非显式设置 `outputFile`。
+推荐使用 `OutputFormat` 枚举设置格式，也接受原始字符串（`"json"`、`"message-pack"`）。输出文件扩展名随 `format` 而定，除非显式设置 `outputFile`。
 
 每次构建时，插件会扫描 `oh_modules/` 并生成 `entry/src/main/resources/rawfile/osslibraries.<ext>`（默认 `osslibraries.json`）。

@@ -11,7 +11,7 @@
 
 import { decode } from "@msgpack/msgpack";
 import { describe, expect, it } from "vite-plus/test";
-import { getSerializer } from "../src/format.js";
+import { getSerializer, OutputFormat } from "../src/format.js";
 import { serializeResult } from "../src/scanner.js";
 import type { ScanResult } from "../src/types.js";
 
@@ -64,6 +64,11 @@ describe("getSerializer", () => {
     const fromJson = JSON.parse(getSerializer("json").encode(sample).toString("utf-8"));
     const fromMsgpack = decode(getSerializer("message-pack").encode(sample));
     expect(fromMsgpack).toEqual(fromJson);
+  });
+
+  it("OutputFormat enum members resolve to the expected serializers", () => {
+    expect(getSerializer(OutputFormat.JSON)).toBe(getSerializer("json"));
+    expect(getSerializer(OutputFormat.MessagePack)).toBe(getSerializer("message-pack"));
   });
 
   it("throws on unknown format with a helpful message listing valid options", () => {
