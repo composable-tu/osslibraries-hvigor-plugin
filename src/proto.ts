@@ -161,8 +161,9 @@ export function serializeProto(result: ScanResult): ProtoSerialization {
         : undefined,
       // Free-form JSON values serialized to strings — lossless and
       // schema-self-contained. Empty array / null both serialize canonically.
-      organization: JSON.stringify(lib.organization),
-      funding: JSON.stringify(lib.funding),
+      // Normalize undefined/missing to null so “no value” is consistently encoded.
+      organization: JSON.stringify(lib.organization ?? null),
+      funding: JSON.stringify(lib.funding ?? null),
       tag: lib.tag,
       licenses: lib.licenses,
     })),
