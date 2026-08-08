@@ -41,6 +41,7 @@ describe("getSerializer", () => {
     const serializer = getSerializer("json");
     expect(serializer.extension).toBe("json");
     expect(serializer.name).toBe("JSON");
+    expect(Buffer.isBuffer(serializer.encode(sample))).toBe(true);
     expect(serializer.encode(sample).toString("utf-8")).toBe(serializeResult(sample));
   });
 
