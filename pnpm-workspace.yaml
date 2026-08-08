@@ -12,7 +12,7 @@ minimumReleaseAgeExclude:
   - "@voidzero-dev/vite-plus-win32-arm64-msvc@0.2.8"
   - "@voidzero-dev/vite-plus-win32-x64-msvc@0.2.8"
   - vite-plus@0.2.8
-  - '@types/node@26.2.0'
+  - "@types/node@26.2.0"
 overrides:
   vite: "catalog:"
 peerDependencyRules:

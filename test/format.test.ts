@@ -41,8 +41,9 @@ describe("getSerializer", () => {
     const serializer = getSerializer("json");
     expect(serializer.extension).toBe("json");
     expect(serializer.name).toBe("JSON");
-    expect(Buffer.isBuffer(serializer.encode(sample))).toBe(true);
-    expect(serializer.encode(sample).toString("utf-8")).toBe(serializeResult(sample));
+    const bytes = serializer.encode(sample);
+    expect(Buffer.isBuffer(bytes)).toBe(true);
+    expect(bytes.toString("utf-8")).toBe(serializeResult(sample));
   });
 
   it("MessagePack serializer round-trips back to the same object", () => {
@@ -63,5 +64,11 @@ describe("getSerializer", () => {
     const fromJson = JSON.parse(getSerializer("json").encode(sample).toString("utf-8"));
     const fromMsgpack = decode(getSerializer("message-pack").encode(sample));
     expect(fromMsgpack).toEqual(fromJson);
+  });
+
+  it("throws on unknown format with a helpful message listing valid options", () => {
+    expect(() => getSerializer("yaml")).toThrow(
+      /unknown output format "yaml".*Valid formats: json, message-pack/,
+    );
   });
 });

@@ -56,7 +56,18 @@ const SERIALIZERS: Record<OutputFormat, Serializer> = {
   "message-pack": messagePackSerializer,
 };
 
-/** Resolve a format name into its `Serializer`. */
-export function getSerializer(format: OutputFormat): Serializer {
-  return SERIALIZERS[format];
+/**
+ * Resolve a format name into its `Serializer`.
+ *
+ * Accepts a plain string so values from untyped sources (e.g. Hvigor config)
+ * are validated at runtime rather than silently returning `undefined`. Throws
+ * on unknown formats with the list of valid options, so a typo surfaces as a
+ * clear build-time error instead of a cryptic crash on `serializer.encode`.
+ */
+export function getSerializer(format: string): Serializer {
+  if (!(format in SERIALIZERS)) {
+    const valid = Object.keys(SERIALIZERS).join(", ");
+    throw new Error(`[osslibraries] unknown output format "${format}". Valid formats: ${valid}.`);
+  }
+  return SERIALIZERS[format as OutputFormat];
 }
