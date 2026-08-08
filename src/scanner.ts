@@ -220,7 +220,20 @@ function compareLibraries(a: LibraryEntry, b: LibraryEntry): number {
   return byName !== 0 ? byName : compareVersions(a.artifactVersion, b.artifactVersion);
 }
 
+/**
+ * Build the plain object shape consumed by OSSLibraries at runtime.
+ *
+ * Centralizing this keeps the JSON and MessagePack serializers in sync — they
+ * both encode exactly this structure.
+ */
+export function toOutputObject(result: ScanResult): {
+  libraries: LibraryEntry[];
+  licenses: Record<string, LicenseEntry>;
+} {
+  return { libraries: result.libraries, licenses: result.licenses };
+}
+
 /** Serialize the scan result to OSSLibraries JSON. */
 export function serializeResult(result: ScanResult): string {
-  return JSON.stringify({ libraries: result.libraries, licenses: result.licenses });
+  return JSON.stringify(toOutputObject(result));
 }

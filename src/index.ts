@@ -18,7 +18,9 @@
  */
 export { ossScanPlugin } from "./plugin.js";
 export type { OssScanPluginOptions } from "./plugin.js";
-export { scanProject, serializeResult, buildLibrary } from "./scanner.js";
+export { scanProject, serializeResult, toOutputObject, buildLibrary } from "./scanner.js";
+export { getSerializer, OutputFormat } from "./format.js";
+export type { Serializer } from "./format.js";
 export { resolveLicense, contentHash } from "./spdx.js";
 export { parseJson5, parseOhPackage, readOhPackage } from "./ohpm.js";
 export type { ScanResult, ScanOptions, LibraryEntry, LicenseEntry, OhPackage } from "./types.js";

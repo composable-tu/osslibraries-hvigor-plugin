@@ -51,4 +51,23 @@ export default {
 > plugins: [ossScanPlugin({ selfModules: ["mylibrary", "3rdlibrary"] })];
 > ```
 
-每次构建时，插件会扫描 `oh_modules/` 并生成 `entry/src/main/resources/rawfile/osslibraries.json`。
+## 配置
+
+### `format`
+
+生成许可证元数据的输出格式（默认 `"json"`）。
+
+| 值               | 输出文件               | 说明                     |
+| ---------------- | ---------------------- | ------------------------ |
+| `"json"`         | `osslibraries.json`    | 人类可读 JSON（默认）。  |
+| `"message-pack"` | `osslibraries.msgpack` | 紧凑二进制 MessagePack。 |
+
+```ts
+import { ossScanPlugin, OutputFormat } from "osslibraries-hvigor-plugin";
+
+plugins: [ossScanPlugin({ format: OutputFormat.MessagePack })];
+```
+
+推荐使用 `OutputFormat` 枚举设置格式，也接受原始字符串（`"json"`、`"message-pack"`）。输出文件扩展名随 `format` 而定，除非显式设置 `outputFile`。
+
+每次构建时，插件会扫描 `oh_modules/` 并生成 `entry/src/main/resources/rawfile/osslibraries.<ext>`（默认 `osslibraries.json`）。
