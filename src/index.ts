@@ -17,8 +17,15 @@
  * license metadata for the OSSLibraries UI library.
  */
 export { ossScanPlugin } from "./plugin.js";
-export type { OssScanPluginOptions } from "./plugin.js";
+export type { OssScanPluginOptions, OutputFormat } from "./plugin.js";
 export { scanProject, serializeResult, buildLibrary } from "./scanner.js";
 export { resolveLicense, contentHash } from "./spdx.js";
 export { parseJson5, parseOhPackage, readOhPackage } from "./ohpm.js";
+export {
+  serializeProto,
+  deserializeProto,
+  getScanResultType,
+  OSSLIBRARIES_PROTO_SCHEMA,
+} from "./proto.js";
+export type { ProtoSerialization } from "./proto.js";
 export type { ScanResult, ScanOptions, LibraryEntry, LicenseEntry, OhPackage } from "./types.js";

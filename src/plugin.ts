@@ -12,8 +12,9 @@
 
 /**
  * A Hvigor plugin that scans OHPM dependencies at build time and generates an
- * `osslibraries.json` into the entry module's rawfile directory, so it gets
- * packaged into the HAP and read at runtime by the OSSLibraries OHPM library.
+ * `osslibraries.json` (or protobuf equivalent) into the entry module's rawfile
+ * directory, so it gets packaged into the HAP and read at runtime by the
+ * OSSLibraries OHPM library.
  *
  * Usage (in entry/hvigorfile.ts):
  *   import { ossScanPlugin } from 'osslibraries-hvigor-plugin';
@@ -21,6 +22,13 @@
  *     system: hapTasks,
  *     plugins: [ossScanPlugin()]
  *   }
+ *
+ * To emit protobuf instead of JSON:
+ *   plugins: [ossScanPlugin({ format: 'proto' })]
+ *
+ * To omit the .proto schema in production (when the runtime uses a
+ * pre-compiled schema):
+ *   plugins: [ossScanPlugin({ format: 'proto', emitSchema: false })]
  */
 "use strict";
 
@@ -28,6 +36,10 @@ import * as path from "path";
 import * as fs from "fs";
 import type { HvigorNode, HvigorPlugin } from "@ohos/hvigor";
 import { scanProject, serializeResult } from "./scanner.js";
+import { serializeProto } from "./proto.js";
+
+/** Output format for the generated license metadata. */
+export type OutputFormat = "json" | "proto";
 
 /** Options for the OSS Libraries scan plugin. */
 export interface OssScanPluginOptions {
@@ -38,20 +50,79 @@ export interface OssScanPluginOptions {
    */
   selfModules?: string[];
   /**
-   * Relative path (from the module path) to the output JSON file.
-   * Defaults to 'src/main/resources/rawfile/osslibraries.json'.
+   * Relative path (from the module path) to the output file.
+   *
+   * - `format: 'json'` (default): the path is used as-is and defaults to
+   *   `src/main/resources/rawfile/osslibraries.json`.
+   * - `format: 'proto'`: the path is treated as a base name; the binary
+   *   payload is written to `<base>.pb` and the `.proto` schema to
+   *   `<base>.proto`. Defaults to
+   *   `src/main/resources/rawfile/osslibraries`.
    */
   outputFile?: string;
+  /**
+   * Output format. `'json'` (default) emits the JSON consumed by the
+   * OSSLibraries runtime. `'proto'` emits a protobuf binary payload plus the
+   * `.proto` schema the runtime needs to decode it.
+   */
+  format?: OutputFormat;
+  /**
+   * Whether to emit the `.proto` schema file alongside the binary payload.
+   *
+   * Only meaningful with `format: 'proto'`. Defaults to `true` so a fresh
+   * project works out of the box. Set to `false` in production builds when the
+   * runtime decodes with a pre-compiled schema (e.g. `pbjs`-generated static
+   * code) or an embedded schema string rather than `protobuf.load('.proto')`
+   * — this avoids shipping the schema file in the HAP.
+   */
+  emitSchema?: boolean;
 }
 
 const PLUGIN_ID = "osslibraries_scan_plugin";
 const TASK_NAME = "ossScanLicenses";
 
+const DEFAULT_JSON_OUTPUT = path.join("src", "main", "resources", "rawfile", "osslibraries.json");
+const DEFAULT_PROTO_BASE = path.join("src", "main", "resources", "rawfile", "osslibraries");
+
+/** Resolved on-disk targets for the chosen format. */
+interface ResolvedOutput {
+  /** Directory that must exist before writing. */
+  dir: string;
+  /** JSON output file (set when `format === 'json'`). */
+  json?: string;
+  /** Protobuf binary file (set when `format === 'proto'`). */
+  protoBinary?: string;
+  /** Protobuf schema file, or `undefined` when `emitSchema === false`. */
+  protoSchema?: string;
+}
+
+/**
+ * Resolve the user-facing `outputFile` option into concrete on-disk paths for
+ * the chosen format. Centralized here so the task body stays declarative.
+ */
+function resolveOutputPaths(
+  modulePath: string,
+  format: OutputFormat,
+  outputFile: string | undefined,
+  emitSchema: boolean,
+): ResolvedOutput {
+  if (format === "proto") {
+    const base = path.resolve(modulePath, outputFile ?? DEFAULT_PROTO_BASE);
+    return {
+      dir: path.dirname(base),
+      protoBinary: `${base}.pb`,
+      protoSchema: emitSchema ? `${base}.proto` : undefined,
+    };
+  }
+  const file = path.resolve(modulePath, outputFile ?? DEFAULT_JSON_OUTPUT);
+  return { dir: path.dirname(file), json: file };
+}
+
 /**
  * Create the OSS Libraries scan hvigor plugin.
  *
  * Registers a task that runs before the entry module's CompileArkTS task,
- * scanning oh_modules and writing the generated JSON into rawfile so it is
+ * scanning oh_modules and writing the generated metadata into rawfile so it is
  * packaged into the HAP.
  */
 export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
@@ -62,10 +133,11 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
       const moduleName = node.getNodeName();
       const projectRoot = path.resolve(modulePath, "..");
 
-      const rawfileDir = path.join(modulePath, "src", "main", "resources", "rawfile");
-      const outputFile = options?.outputFile
-        ? path.resolve(modulePath, options.outputFile)
-        : path.join(rawfileDir, "osslibraries.json");
+      const format: OutputFormat = options?.format ?? "json";
+      // emitSchema only affects the proto format; default to true so a fresh
+      // project decodes out of the box.
+      const emitSchema = options?.emitSchema ?? true;
+      const out = resolveOutputPaths(modulePath, format, options?.outputFile, emitSchema);
 
       // Always exclude the module the plugin is registered on.
       const selfModules = new Set<string>(options?.selfModules ?? []);
@@ -76,14 +148,30 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
         run: () => {
           console.log(`[osslibraries] scanning OHPM dependencies at ${projectRoot}`);
           const result = scanProject(projectRoot, { selfModules });
-          const json = serializeResult(result);
 
-          const outDir = path.dirname(outputFile);
-          if (!fs.existsSync(outDir)) {
-            fs.mkdirSync(outDir, { recursive: true });
+          if (!fs.existsSync(out.dir)) {
+            fs.mkdirSync(out.dir, { recursive: true });
           }
-          fs.writeFileSync(outputFile, json, "utf-8");
-          console.log(`[osslibraries] wrote ${result.libraries.length} libraries to ${outputFile}`);
+
+          if (format === "proto") {
+            const { binary, schema } = serializeProto(result);
+            fs.writeFileSync(out.protoBinary!, Buffer.from(binary));
+            if (out.protoSchema) {
+              fs.writeFileSync(out.protoSchema, schema, "utf-8");
+              console.log(
+                `[osslibraries] wrote ${result.libraries.length} libraries (proto) to ${out.protoBinary} + ${out.protoSchema}`,
+              );
+            } else {
+              console.log(
+                `[osslibraries] wrote ${result.libraries.length} libraries (proto) to ${out.protoBinary}`,
+              );
+            }
+          } else {
+            fs.writeFileSync(out.json!, serializeResult(result), "utf-8");
+            console.log(
+              `[osslibraries] wrote ${result.libraries.length} libraries (json) to ${out.json}`,
+            );
+          }
         },
         dependencies: [],
         postDependencies: ["default@CompileArkTS"],
