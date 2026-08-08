@@ -199,4 +199,35 @@ describe("serializeProto / deserializeProto", () => {
     const bar = decoded.libraries.find((l) => l.name === "bar")!;
     expect((bar.licenses as string[]).sort()).toEqual(["hash-apache", "hash-mit"]);
   });
+
+  it("normalizes undefined organization/funding to canonical empty values", () => {
+    // A caller violating the type with undefined must not silently drop the
+    // field via JSON.stringify(undefined) === undefined. organization falls
+    // back to null, funding to [] — matching the scanner's own conventions.
+    const result: ScanResult = {
+      libraries: [
+        {
+          uniqueId: "u",
+          artifactVersion: "1.0.0",
+          name: "u",
+          description: "",
+          website: "",
+          developers: [],
+          scm: null,
+          organization: undefined as unknown as null,
+          funding: undefined as unknown as [],
+          tag: [],
+          licenses: [],
+        },
+      ],
+      licenses: {},
+    };
+    const { binary } = serializeProto(result);
+    const decoded = deserializeProto(binary) as {
+      libraries: Array<Record<string, unknown>>;
+    };
+    const lib = decoded.libraries[0]!;
+    expect(JSON.parse(lib.organization as string)).toBeNull();
+    expect(JSON.parse(lib.funding as string)).toEqual([]);
+  });
 });

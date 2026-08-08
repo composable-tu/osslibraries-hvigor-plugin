@@ -160,10 +160,13 @@ export function serializeProto(result: ScanResult): ProtoSerialization {
           }
         : undefined,
       // Free-form JSON values serialized to strings — lossless and
-      // schema-self-contained. Empty array / null both serialize canonically.
-      // Normalize undefined/missing to null so “no value” is consistently encoded.
+      // schema-self-contained. Normalize undefined/missing to each field's
+      // canonical empty value BEFORE stringifying: JSON.stringify(undefined)
+      // returns undefined (not a string), which would silently drop the field
+      // from the wire. organization is null-shaped; funding is array-shaped,
+      // matching the scanner's own conventions and the TypeScript types.
       organization: JSON.stringify(lib.organization ?? null),
-      funding: JSON.stringify(lib.funding ?? null),
+      funding: JSON.stringify(lib.funding ?? []),
       tag: lib.tag,
       licenses: lib.licenses,
     })),
@@ -179,18 +182,17 @@ export function serializeProto(result: ScanResult): ProtoSerialization {
 /**
  * Decode a protobuf-encoded `osslibraries.ScanResult` back to a plain object.
  *
- * Provided primarily for round-trip tests and as a reference for the runtime
- * side: the shape returned here matches what `serializeProto` consumed, so a
- * test can assert losslessness by re-serializing.
+ * Non-lossy: no `bytes`/`longs`/`enums` string coercion is applied, so any
+ * future field of those wire types round-trips in its native JS form
+ * (Uint8Array / Long / number). `defaults: true` surfaces proto3 default
+ * values for unset fields so every field is present in the output.
+ *
+ * Used by the round-trip tests here and suitable for Node-side tooling that
+ * needs to inspect an emitted `.pb` file. The HarmonyOS runtime decodes with
+ * `@ohos/protobufjs` directly and does not call this function.
  */
 export function deserializeProto(binary: Uint8Array): Record<string, unknown> {
   const ScanResultType = getScanResultType();
   const message = ScanResultType.decode(binary);
-  // toObject({ bytes: String }) keeps the output JSON-friendly for assertions.
-  return ScanResultType.toObject(message, {
-    longs: String,
-    bytes: String,
-    enums: String,
-    defaults: true,
-  }) as Record<string, unknown>;
+  return ScanResultType.toObject(message, { defaults: true }) as Record<string, unknown>;
 }
