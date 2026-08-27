@@ -14,7 +14,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import { parseOhPackage } from "../src/ohpm.js";
+import { parseOhPackage, readOhPackage } from "../src/ohpm.js";
 import { scanProject, serializeResult } from "../src/scanner.js";
 
 function writePkg(root: string, relPath: string, content: string | object): void {
@@ -64,6 +64,22 @@ describe("parseOhPackage", () => {
     });
     expect(pkg.authorName).toBe("Alice");
     expect(pkg.authorUrl).toBe("");
+  });
+});
+
+describe("readOhPackage", () => {
+  it("returns null instead of throwing on malformed JSON5", () => {
+    const abs = join(root, "broken", "oh-package.json5");
+    writePkg(root, "broken/oh-package.json5", "{ name: 'broken', version: ");
+
+    expect(readOhPackage(abs, "fallback")).toBeNull();
+  });
+
+  it("falls back to the path-derived name when the manifest omits one", () => {
+    const abs = join(root, "noName", "oh-package.json5");
+    writePkg(root, "noName/oh-package.json5", { version: "1.0.0" });
+
+    expect(readOhPackage(abs, "fallback")?.name).toBe("fallback");
   });
 });
 
@@ -218,6 +234,18 @@ describe("scanProject", () => {
 
     const { libraries } = scanProject(root);
     expect(libraries.map((l) => l.name)).toEqual(["@scope/bar"]);
+  });
+
+  it("skips dependencies with malformed manifests and keeps the rest", () => {
+    writePkg(root, "oh_modules/bad/oh-package.json5", "{ this is not json5 !!");
+    writePkg(root, "oh_modules/good/oh-package.json5", {
+      name: "good",
+      version: "1.0.0",
+      license: "MIT",
+    });
+
+    const { libraries } = scanProject(root);
+    expect(libraries.map((l) => l.name)).toEqual(["good"]);
   });
 
   it("serializes into the OSSLibraries JSON shape", () => {

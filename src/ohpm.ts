@@ -107,7 +107,8 @@ export function parseOhPackage(obj: Record<string, unknown>): OhPackage {
 
 /**
  * Read and parse an oh-package.json5 file. Falls back to `fallbackName` when
- * the manifest omits its name, and returns null when the file is unreadable.
+ * the manifest omits its name, and returns null when the file is unreadable
+ * or unparseable.
  */
 export function readOhPackage(filePath: string, fallbackName: string): OhPackage | null {
   let text: string;
@@ -116,7 +117,18 @@ export function readOhPackage(filePath: string, fallbackName: string): OhPackage
   } catch {
     return null;
   }
-  const pkg = parseOhPackage(parseJson5(text));
+
+  let pkg: OhPackage;
+  try {
+    pkg = parseOhPackage(parseJson5(text));
+  } catch (error) {
+    // A single malformed dependency manifest must not fail the whole build,
+    // but it should not vanish silently either — the dropped package would
+    // otherwise be missing from the license report without any trace.
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn(`[osslibraries] skipping ${filePath}: malformed oh-package.json5 (${reason})`);
+    return null;
+  }
   if (!pkg.name) {
     pkg.name = fallbackName;
   }
