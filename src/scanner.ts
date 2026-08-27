@@ -14,7 +14,9 @@
  * OHPM dependency scanner.
  *
  * Discovers every oh-package.json5 under a project's oh_modules directories
- * (via fast-glob), assembles one `LibraryEntry` per dependency, deduplicates
+ * (via fast-glob), optionally including the `oh_modules/.ohpm` package store
+ * where the physical copies and non-hoisted transitive versions live,
+ * assembles one `LibraryEntry` per dependency, deduplicates
  * by name+version so multiple versions appear side by side, prefers the
  * LICENSE file bundled in each HAR package for the full license text, and
  * emits the OSSLibraries JSON consumed by the OSSLibraries UI library.
@@ -48,20 +50,39 @@ const LICENSE_FILE_NAMES = [
 ];
 
 /** Find every oh-package.json5 inside the project's oh_modules directories. */
-function findOhPackages(projectRoot: string): string[] {
-  return fg.sync(["**/oh_modules/*/oh-package.json5", "**/oh_modules/@*/*/oh-package.json5"], {
+function findOhPackages(projectRoot: string, includeOhpmCache: boolean): string[] {
+  const patterns = ["**/oh_modules/*/oh-package.json5", "**/oh_modules/@*/*/oh-package.json5"];
+  if (includeOhpmCache) {
+    // The .ohpm store holds the physical package copies in the shape
+    // <name>@<version>/oh_modules/<name>/ (scoped dirs use "+" instead of "/").
+    // The dot segments are written out literally, so this is unaffected by
+    // fast-glob's default exclusion of hidden directories.
+    patterns.push(
+      "**/oh_modules/.ohpm/*/oh_modules/*/oh-package.json5",
+      "**/oh_modules/.ohpm/*/oh_modules/@*/*/oh-package.json5",
+    );
+  }
+  return fg.sync(patterns, {
     cwd: projectRoot,
     onlyFiles: true,
   });
 }
 
-/** Derive the package name from its relative path: "@scope/bar" or "foo". */
+/**
+ * Derive the package name from its relative path: "@scope/bar" or "foo".
+ *
+ * Anchoring on the LAST "oh_modules" segment keeps one implementation for all
+ * shapes — shallow installs ("entry/oh_modules/foo"), scoped ones
+ * ("oh_modules/@scope/bar"), and .ohpm store copies
+ * ("oh_modules/.ohpm/foo@1.0.0/oh_modules/foo"), where the version directory
+ * and the inner oh_modules level are skipped automatically.
+ */
 function packageNameFromPath(relativePath: string): string {
   // fast-glob always returns POSIX-style paths regardless of platform, so
   // split on "/" rather than path.sep (which would be "\\" on Windows and
   // fail to segment the glob result).
   const parts = relativePath.split("/");
-  const idx = parts.indexOf("oh_modules");
+  const idx = parts.lastIndexOf("oh_modules");
   const next = parts[idx + 1];
   if (next?.startsWith("@")) {
     return `${next}/${parts[idx + 2] ?? ""}`;
@@ -164,7 +185,7 @@ export function scanProject(projectRoot: string, options?: ScanOptions): ScanRes
   }
 
   const built: { lib: LibraryEntry; licenses: LicenseEntry[] }[] = [];
-  for (const relativePath of findOhPackages(projectRoot)) {
+  for (const relativePath of findOhPackages(projectRoot, options?.includeOhpmCache ?? false)) {
     const pkgDir = path.dirname(path.resolve(projectRoot, relativePath));
     const pkg = readOhPackage(
       path.join(pkgDir, "oh-package.json5"),

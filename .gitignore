@@ -146,3 +146,4 @@ vite.config.ts.timestamp-*
 .npmrc
 
 .DS_Store
+.zcode

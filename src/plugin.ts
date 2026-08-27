@@ -39,6 +39,20 @@ export interface OssScanPluginOptions {
    */
   selfModules?: string[];
   /**
+   * Also scan `oh_modules/.ohpm` — OHPM's internal package store. Off by
+   * default; declare this option to enable it.
+   *
+   * Modern OHPM keeps every physical package copy in
+   * `.ohpm/<name>@<version>/oh_modules/<name>/` and hangs symlinks at
+   * `oh_modules/<name>`; transitive versions that are not hoisted to a
+   * top-level symlink exist ONLY inside the store, so shallow scanning misses
+   * them (projects whose top-level oh_modules entries are all symlinks may be
+   * missed entirely). Enabling this makes the scan read the store directly.
+   * Stale copies under build caches that share the store layout are collapsed
+   * by name@version deduplication.
+   */
+  includeOhpmCache?: boolean;
+  /**
    * Relative path (from the module path) to the output file. When omitted,
    * defaults to 'src/main/resources/rawfile/osslibraries.<ext>', where
    * <ext> follows `format` ("json" or "msgpack").
@@ -90,7 +104,10 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
         name: TASK_NAME,
         run: () => {
           console.log(`[osslibraries] scanning OHPM dependencies at ${projectRoot}`);
-          const result = scanProject(projectRoot, { selfModules });
+          const result = scanProject(projectRoot, {
+            selfModules,
+            includeOhpmCache: options?.includeOhpmCache ?? false,
+          });
           const bytes = serializer.encode(result);
 
           const outDir = path.dirname(outputFile);
