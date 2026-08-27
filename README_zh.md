@@ -80,6 +80,6 @@ plugins: [ossScanPlugin({ format: OutputFormat.MessagePack })];
 plugins: [ossScanPlugin({ includeOhpmCache: true })];
 ```
 
-OHPM 把每个包的实体副本放在 `.ohpm/<name>@<version>/oh_modules/<name>/` 下，并在 `oh_modules/<name>` 处挂符号链接。未被提升到顶层的传递依赖版本只存在于内部仓库中；若工程顶层全是符号链接，默认浅层扫描可能完全读不到依赖。
+OHPM 把每个包的实体副本放在 `.ohpm/<name>@<version>/oh_modules/<name>/` 下，并通过符号链接挂载在 `oh_modules/<name>`。未被提升到顶层的传递依赖版本只存在于内部仓库中；声明此选项后，同一依赖的所有已装版本——包括冲突的传递版本——都会并列进入 License 数据。
 
-当 License 列表看起来不完整（依赖缺失，或需要把同一依赖的所有已装版本——包括冲突的传递版本——并列列出）时，声明此选项开启增强扫描。
+需要完整覆盖（列出的依赖覆盖 `oh_modules/` 中全部已装版本，无论其是否被提升到顶层）时，声明此选项。

@@ -80,6 +80,6 @@ Also scan `oh_modules/.ohpm` (default `false`).
 plugins: [ossScanPlugin({ includeOhpmCache: true })];
 ```
 
-OHPM keeps every physical package copy in `.ohpm/<name>@<version>/oh_modules/<name>/` and hangs symlinks at `oh_modules/<name>`. Transitive versions that are not hoisted to a top-level symlink exist only inside the store, and projects whose top-level entries are all symlinks may be missed entirely by the default shallow scan.
+OHPM keeps every physical package copy in `.ohpm/<name>@<version>/oh_modules/<name>/`, mounted at `oh_modules/<name>` through symlinks. Transitive dependency versions that are not hoisted to a top-level symlink live only inside the store, so enabling this option lists every installed version of a dependency in the license data — including conflicting transitive versions appearing side by side.
 
-Enable this when your license list looks incomplete: dependencies are missing, or you need every installed version of a dependency (including conflicting transitive ones) to appear side by side.
+Declare this option when you need complete coverage: every dependency version installed into `oh_modules/`, regardless of whether it is hoisted to the top level.

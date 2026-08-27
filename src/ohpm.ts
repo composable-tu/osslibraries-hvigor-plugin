@@ -122,9 +122,8 @@ export function readOhPackage(filePath: string, fallbackName: string): OhPackage
   try {
     pkg = parseOhPackage(parseJson5(text));
   } catch (error) {
-    // A single malformed dependency manifest must not fail the whole build,
-    // but it should not vanish silently either — the dropped package would
-    // otherwise be missing from the license report without any trace.
+    // Malformed manifests are isolated here: the owning package drops out of
+    // the license report and the warning keeps that loss traceable.
     const reason = error instanceof Error ? error.message : String(error);
     console.warn(`[osslibraries] skipping ${filePath}: malformed oh-package.json5 (${reason})`);
     return null;

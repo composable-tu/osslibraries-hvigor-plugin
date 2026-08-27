@@ -39,17 +39,13 @@ export interface OssScanPluginOptions {
    */
   selfModules?: string[];
   /**
-   * Also scan `oh_modules/.ohpm` — OHPM's internal package store. Off by
-   * default; declare this option to enable it.
-   *
-   * Modern OHPM keeps every physical package copy in
-   * `.ohpm/<name>@<version>/oh_modules/<name>/` and hangs symlinks at
-   * `oh_modules/<name>`; transitive versions that are not hoisted to a
-   * top-level symlink exist ONLY inside the store, so shallow scanning misses
-   * them (projects whose top-level oh_modules entries are all symlinks may be
-   * missed entirely). Enabling this makes the scan read the store directly.
-   * Stale copies under build caches that share the store layout are collapsed
-   * by name@version deduplication.
+   * Also scan `oh_modules/.ohpm` — OHPM's internal package store, where the
+   * physical copy of each package lives at
+   * `.ohpm/<name>@<version>/oh_modules/<name>/`, mounted at `oh_modules/<name>`
+   * through symlinks. Transitive dependency versions that are not hoisted to a
+   * top-level symlink exist only in the store, so enabling this surfaces every
+   * installed version in the license list. Off by default; declare this option
+   * to enable it.
    */
   includeOhpmCache?: boolean;
   /**
@@ -74,9 +70,10 @@ const TASK_NAME = "ossScanLicenses";
 /**
  * Create the OSS Libraries scan hvigor plugin.
  *
- * Registers a task that runs before the entry module's CompileArkTS task,
- * scanning oh_modules and writing the generated JSON into rawfile so it is
- * packaged into the HAP.
+ * Registers a task on the module that scans oh_modules and writes the
+ * generated license metadata into rawfile so it is packaged into the HAP;
+ * the task runs after the module's default@CompileArkTS via postDependencies,
+ * ahead of resource packaging.
  */
 export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
   return {
