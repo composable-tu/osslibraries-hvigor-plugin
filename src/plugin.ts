@@ -39,6 +39,16 @@ export interface OssScanPluginOptions {
    */
   selfModules?: string[];
   /**
+   * Also scan `oh_modules/.ohpm` — OHPM's internal package store, where the
+   * physical copy of each package lives at
+   * `.ohpm/<name>@<version>/oh_modules/<name>/`, mounted at `oh_modules/<name>`
+   * through symlinks. Transitive dependency versions that are not hoisted to a
+   * top-level symlink exist only in the store, so enabling this surfaces every
+   * installed version in the license list. Off by default; declare this option
+   * to enable it.
+   */
+  includeOhpmCache?: boolean;
+  /**
    * Relative path (from the module path) to the output file. When omitted,
    * defaults to 'src/main/resources/rawfile/osslibraries.<ext>', where
    * <ext> follows `format` ("json" or "msgpack").
@@ -60,9 +70,10 @@ const TASK_NAME = "ossScanLicenses";
 /**
  * Create the OSS Libraries scan hvigor plugin.
  *
- * Registers a task that runs before the entry module's CompileArkTS task,
- * scanning oh_modules and writing the generated JSON into rawfile so it is
- * packaged into the HAP.
+ * Registers a task on the module that scans oh_modules and writes the
+ * generated license metadata into rawfile so it is packaged into the HAP;
+ * the task runs after the module's default@CompileArkTS via postDependencies,
+ * ahead of resource packaging.
  */
 export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
   return {
@@ -90,7 +101,10 @@ export function ossScanPlugin(options?: OssScanPluginOptions): HvigorPlugin {
         name: TASK_NAME,
         run: () => {
           console.log(`[osslibraries] scanning OHPM dependencies at ${projectRoot}`);
-          const result = scanProject(projectRoot, { selfModules });
+          const result = scanProject(projectRoot, {
+            selfModules,
+            includeOhpmCache: options?.includeOhpmCache ?? false,
+          });
           const bytes = serializer.encode(result);
 
           const outDir = path.dirname(outputFile);

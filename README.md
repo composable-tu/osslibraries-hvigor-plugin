@@ -71,3 +71,15 @@ plugins: [ossScanPlugin({ format: OutputFormat.MessagePack })];
 The `OutputFormat` enum is the recommended way to set the format. Raw strings (`"json"`, `"message-pack"`) are also accepted. The output file extension follows `format` unless you set `outputFile` explicitly.
 
 On each build, the plugin scans `oh_modules/` and generates `entry/src/main/resources/rawfile/osslibraries.<ext>` (`osslibraries.json` by default).
+
+### `includeOhpmCache`
+
+Also scan `oh_modules/.ohpm` (default `false`).
+
+```ts
+plugins: [ossScanPlugin({ includeOhpmCache: true })];
+```
+
+OHPM keeps every physical package copy in `.ohpm/<name>@<version>/oh_modules/<name>/`, mounted at `oh_modules/<name>` through symlinks. Transitive dependency versions that are not hoisted to a top-level symlink live only inside the store, so enabling this option lists every installed version of a dependency in the license data — including conflicting transitive versions appearing side by side.
+
+Declare this option when you need complete coverage: every dependency version installed into `oh_modules/`, regardless of whether it is hoisted to the top level.

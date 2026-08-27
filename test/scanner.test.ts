@@ -14,7 +14,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import { parseOhPackage } from "../src/ohpm.js";
+import { parseOhPackage, readOhPackage } from "../src/ohpm.js";
 import { scanProject, serializeResult } from "../src/scanner.js";
 
 function writePkg(root: string, relPath: string, content: string | object): void {
@@ -64,6 +64,22 @@ describe("parseOhPackage", () => {
     });
     expect(pkg.authorName).toBe("Alice");
     expect(pkg.authorUrl).toBe("");
+  });
+});
+
+describe("readOhPackage", () => {
+  it("returns null instead of throwing on malformed JSON5", () => {
+    const abs = join(root, "broken", "oh-package.json5");
+    writePkg(root, "broken/oh-package.json5", "{ name: 'broken', version: ");
+
+    expect(readOhPackage(abs, "fallback")).toBeNull();
+  });
+
+  it("falls back to the path-derived name when the manifest omits one", () => {
+    const abs = join(root, "noName", "oh-package.json5");
+    writePkg(root, "noName/oh-package.json5", { version: "1.0.0" });
+
+    expect(readOhPackage(abs, "fallback")?.name).toBe("fallback");
   });
 });
 
@@ -220,6 +236,18 @@ describe("scanProject", () => {
     expect(libraries.map((l) => l.name)).toEqual(["@scope/bar"]);
   });
 
+  it("skips dependencies with malformed manifests and keeps the rest", () => {
+    writePkg(root, "oh_modules/bad/oh-package.json5", "{ this is not json5 !!");
+    writePkg(root, "oh_modules/good/oh-package.json5", {
+      name: "good",
+      version: "1.0.0",
+      license: "MIT",
+    });
+
+    const { libraries } = scanProject(root);
+    expect(libraries.map((l) => l.name)).toEqual(["good"]);
+  });
+
   it("serializes into the OSSLibraries JSON shape", () => {
     writePkg(root, "oh_modules/foo/oh-package.json5", {
       name: "foo",
@@ -260,5 +288,77 @@ describe("scanProject", () => {
         }),
       );
     }
+  });
+});
+
+describe("scanProject includeOhpmCache (oh_modules/.ohpm store)", () => {
+  // Real OHPM store layout: .ohpm/<name>@<version>/oh_modules/<name>/, with
+  // "+" standing in for "/" in scoped version directories.
+  const storeLayout = () => {
+    writePkg(root, "oh_modules/.ohpm/pangu_cjk@0.0.3/oh_modules/pangu_cjk/oh-package.json5", {
+      name: "pangu_cjk",
+      version: "0.0.3",
+      license: "MulanPSL-2.0",
+    });
+    writePkg(
+      root,
+      "oh_modules/.ohpm/@ohos+msgpack@1.0.2/oh_modules/@ohos/msgpack/oh-package.json5",
+      {
+        name: "@ohos/msgpack",
+        version: "1.0.2",
+        license: "ISC",
+      },
+    );
+  };
+
+  it("ignores the .ohpm store by default", () => {
+    storeLayout();
+
+    const { libraries } = scanProject(root);
+    expect(libraries).toHaveLength(0);
+  });
+
+  it("reads normal and scoped packages from the store with correct names", () => {
+    storeLayout();
+
+    const { libraries } = scanProject(root, { includeOhpmCache: true });
+    expect(libraries.map((l) => l.name).sort()).toEqual(["@ohos/msgpack", "pangu_cjk"]);
+  });
+
+  it("collapses a package present both shallow and in the store into one entry", () => {
+    const pkg = { name: "foo", version: "1.0.0", license: "MIT" };
+    writePkg(root, "oh_modules/foo/oh-package.json5", pkg);
+    writePkg(root, "oh_modules/.ohpm/foo@1.0.0/oh_modules/foo/oh-package.json5", pkg);
+
+    const { libraries } = scanProject(root, { includeOhpmCache: true });
+    expect(libraries.filter((l) => l.name === "foo")).toHaveLength(1);
+  });
+
+  it("lists non-hoisted transitive versions that only exist in the store", () => {
+    writePkg(root, "oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "1.0.0",
+      license: "MIT",
+    });
+    writePkg(root, "oh_modules/.ohpm/foo@2.0.0/oh_modules/foo/oh-package.json5", {
+      name: "foo",
+      version: "2.0.0",
+      license: "Apache-2.0",
+    });
+
+    const { libraries } = scanProject(root, { includeOhpmCache: true });
+    expect(libraries.filter((l) => l.name === "foo").map((l) => l.artifactVersion)).toEqual([
+      "1.0.0",
+      "2.0.0",
+    ]);
+  });
+
+  it("reads the bundled LICENSE file next to the store manifest", () => {
+    storeLayout();
+    writePkg(root, "oh_modules/.ohpm/pangu_cjk@0.0.3/oh_modules/pangu_cjk/LICENSE", "STORE TEXT");
+
+    const { libraries, licenses } = scanProject(root, { includeOhpmCache: true });
+    const pangu = libraries.find((l) => l.name === "pangu_cjk")!;
+    expect(licenses[pangu.licenses[0]].content).toBe("STORE TEXT");
   });
 });

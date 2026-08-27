@@ -71,3 +71,15 @@ plugins: [ossScanPlugin({ format: OutputFormat.MessagePack })];
 推荐使用 `OutputFormat` 枚举设置格式，也接受原始字符串（`"json"`、`"message-pack"`）。输出文件扩展名随 `format` 而定，除非显式设置 `outputFile`。
 
 每次构建时，插件会扫描 `oh_modules/` 并生成 `entry/src/main/resources/rawfile/osslibraries.<ext>`（默认 `osslibraries.json`）。
+
+### `includeOhpmCache`
+
+额外扫描 `oh_modules/.ohpm`（默认 `false`）。
+
+```ts
+plugins: [ossScanPlugin({ includeOhpmCache: true })];
+```
+
+OHPM 把每个包的实体副本放在 `.ohpm/<name>@<version>/oh_modules/<name>/` 下，并通过符号链接挂载在 `oh_modules/<name>`。未被提升到顶层的传递依赖版本只存在于内部仓库中；声明此选项后，同一依赖的所有已装版本——包括冲突的传递版本——都会并列进入 License 数据。
+
+需要完整覆盖（列出的依赖覆盖 `oh_modules/` 中全部已装版本，无论其是否被提升到顶层）时，声明此选项。

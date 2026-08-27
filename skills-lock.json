@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "no-negative-echo": {
+      "source": "LB623/no-negative-echo",
+      "sourceType": "github",
+      "skillPath": "no-negative-echo/SKILL.md",
+      "computedHash": "2b64938e0bb1159048afd3abf4cec88edab61c42b2bba4ffa1f4951ea0b997fc"
+    }
+  }
+}

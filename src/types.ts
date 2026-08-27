@@ -55,6 +55,12 @@ export interface ScanResult {
 export interface ScanOptions {
   /** Module names to skip (host-project local modules). */
   selfModules?: Set<string>;
+  /**
+   * Also scan `oh_modules/.ohpm` — OHPM's internal package store — where the
+   * physical package copies live (top-level entries may be symlinks into it,
+   * and non-hoisted transitive versions exist only there). Defaults to false.
+   */
+  includeOhpmCache?: boolean;
 }
 
 /**
